@@ -25283,17 +25283,29 @@ async function consultarImpresionChombo() {
   }
 }
 
+
 function construirReporteImpresionChombo(datos) {
 
   const esc = escaparImpresionChombo;
   const dinero = dineroImpresionChombo;
+
+  const numero = valor => {
+    if (typeof valor === 'number') return valor;
+    const texto = String(valor ?? '').trim();
+    if (!texto) return 0;
+    const limpio = texto.replace(/,/g, '');
+    const resultado = Number(limpio);
+    return Number.isFinite(resultado) ? resultado : 0;
+  };
 
   const fecha = String(datos.fecha || '');
   const fechaTexto = /^\d{4}-\d{2}-\d{2}$/.test(fecha)
     ? fecha.split('-').reverse().join('/')
     : fecha;
 
-  const filas = (datos.detalles || []).map(item => `
+  const detalles = datos.detalles || [];
+
+  const filas = detalles.map(item => `
     <tr>
       <td>${esc(item.modulo)}</td>
       <td>${esc(item.movimiento)}</td>
@@ -25304,129 +25316,260 @@ function construirReporteImpresionChombo(datos) {
     </tr>
   `).join('');
 
+  // Valor parcial de Efectivo
+  const efectivoParcial = detalles
+    .filter(item =>
+      String(item.movimiento || '').trim()
+        .toLowerCase() === 'efectivo'
+    )
+    .reduce(
+      (suma, item) => suma + numero(item.parcial),
+      0
+    );
 
+  // Totales del turno
+  const entradas = numero(datos.totalEntradas)
+    + efectivoParcial;
+
+  const salidas = numero(datos.totalSalidas);
+
+  const saldo = entradas - salidas;
+
+  // Arqueo de caja
   let tablaCaja = '';
+  let totalEfectivo = 0;
 
   if (datos.arqueo) {
 
     const cantidades = datos.arqueo.cantidades || [];
 
-    // Denominaciones y cantidades del turno seleccionado
     const denominaciones = [
       500, 200, 100, 50, 20, 10, 5, 2, 1
     ];
 
     const lista = denominaciones.map(denominacion => {
 
-      const item = cantidades.find(
-        x => Number(x.denominacion) === denominacion
+      const item = cantidades.find(x =>
+        Number(x.denominacion) === denominacion
       );
 
-      const cantidad = Number(item?.cantidad || 0);
+      const cantidad = numero(item?.cantidad);
 
       return {
         denominacion,
         cantidad,
         valor: denominacion * cantidad
       };
-
     });
 
     const totalCantidad = lista.reduce(
-      (suma, item) => suma + item.cantidad, 0
+      (suma, item) => suma + item.cantidad,
+      0
     );
 
-    const totalValor = lista.reduce(
-      (suma, item) => suma + item.valor, 0
+    totalEfectivo = lista.reduce(
+      (suma, item) => suma + item.valor,
+      0
     );
 
     const columnas = lista.map(item => `
-      <th style="text-align:center;">
-        ${item.denominacion}
-      </th>
+      <th>${item.denominacion}</th>
     `).join('');
 
     const cantidadesHTML = lista.map(item => `
-      <td style="text-align:center;">
-        ${item.cantidad}
-      </td>
+      <td>${item.cantidad}</td>
     `).join('');
 
     const valoresHTML = lista.map(item => `
-      <td style="text-align:center;">
-        ${dinero(item.valor)}
-      </td>
+      <td>${dinero(item.valor)}</td>
     `).join('');
 
+    const saldoMenosEfectivo =
+      saldo - totalEfectivo;
+
     tablaCaja = `
-      <div class="chombo-imp-arqueo">
+      <section class="chombo-imp-arqueo">
 
         <h3>Arqueo de caja</h3>
 
-        <table style="
-          width:100%;
-          border-collapse:collapse;
-          table-layout:fixed;
-          text-align:center;
-        ">
+        <table class="chombo-imp-tabla-arqueo">
 
           <thead>
             <tr>
-              <th style="text-align:center;">Billetes</th>
+              <th>Billetes</th>
               ${columnas}
-              <th style="text-align:center;">Total</th>
+              <th>Total</th>
             </tr>
           </thead>
 
           <tbody>
 
             <tr>
-              <th style="text-align:center;">Cantidad</th>
+              <th>Cantidad</th>
               ${cantidadesHTML}
-              <th style="text-align:center;">
-                ${totalCantidad}
-              </th>
+              <th>${totalCantidad}</th>
             </tr>
 
             <tr>
-              <th style="text-align:center;">Valor</th>
+              <th>Valor</th>
               ${valoresHTML}
-              <th style="text-align:center;">
-                ${dinero(totalValor)}
-              </th>
+              <th>${dinero(totalEfectivo)}</th>
             </tr>
 
           </tbody>
 
         </table>
 
-      </div>
+        <div class="chombo-imp-saldo-efectivo">
+          <span>Saldo - Efectivo</span>
+          <strong>${dinero(saldoMenosEfectivo)}</strong>
+        </div>
+
+      </section>
     `;
 
   } else {
 
     tablaCaja = `
-      <div class="chombo-imp-arqueo">
+      <section class="chombo-imp-arqueo">
         <h3>Arqueo de caja</h3>
         <p>No existe arqueo guardado para este TurnoID.</p>
-      </div>
+      </section>
     `;
-
   }
 
-
-  
   return `
     <div class="chombo-imp-hoja">
 
+      <style>
+        .chombo-imp-hoja {
+          width:100%;
+          max-width:100%;
+          color:#111827;
+          background:white;
+          font-family:Arial,sans-serif;
+          font-size:11px;
+        }
+
+        .chombo-imp-hoja h2 {
+          text-align:center;
+          font-size:16px;
+          margin:0 0 8px;
+        }
+
+        .chombo-imp-encabezado {
+          margin-bottom:9px;
+        }
+
+        .chombo-imp-encabezado p {
+          margin:3px 0;
+          font-size:11px;
+        }
+
+        .chombo-imp-hoja table {
+          width:100%;
+          max-width:100%;
+          border-collapse:collapse;
+          table-layout:fixed;
+          margin:5px 0;
+        }
+
+        .chombo-imp-hoja th,
+        .chombo-imp-hoja td {
+          border:1px solid #9ca3af;
+          padding:4px;
+          font-size:10px;
+          overflow-wrap:anywhere;
+        }
+
+        .chombo-imp-hoja th {
+          background:#e5e7eb;
+          font-weight:bold;
+        }
+
+        .chombo-imp-num {
+          text-align:right;
+          white-space:nowrap;
+        }
+
+        .chombo-imp-totales {
+          width:48%;
+          margin:7px 0 5px auto;
+          border-collapse:collapse;
+        }
+
+        .chombo-imp-totales th,
+        .chombo-imp-totales td {
+          text-align:center;
+          padding:5px 7px;
+          font-size:11px;
+        }
+
+        .chombo-imp-totales
+        .chombo-imp-saldo-fila td {
+          font-weight:bold;
+          background:#eef4ff;
+        }
+
+        .chombo-imp-arqueo {
+          margin-top:5px;
+          break-inside:avoid;
+          page-break-inside:avoid;
+        }
+
+        .chombo-imp-arqueo h3 {
+          text-align:center;
+          font-size:13px;
+          margin:5px 0 4px;
+        }
+
+        .chombo-imp-hoja
+        .chombo-imp-tabla-arqueo {
+          width:100%;
+          table-layout:fixed;
+          margin:3px 0;
+        }
+
+        .chombo-imp-hoja
+        .chombo-imp-tabla-arqueo th,
+        .chombo-imp-hoja
+        .chombo-imp-tabla-arqueo td {
+          text-align:center !important;
+          vertical-align:middle;
+          padding:4px 2px;
+          font-size:9px;
+          white-space:nowrap;
+        }
+
+        .chombo-imp-saldo-efectivo {
+          display:flex;
+          justify-content:flex-end;
+          gap:28px;
+          align-items:center;
+          margin:5px 0 0;
+          padding:5px 9px;
+          font-size:11px;
+          font-weight:bold;
+          background:#eef4ff;
+          border:1px solid #cbd5e1;
+        }
+
+        .chombo-imp-saldo-efectivo strong {
+          min-width:100px;
+          text-align:right;
+        }
+      </style>
+
       <h2>CHOMBO - CIERRE DE TURNO</h2>
 
-      <p><strong>Fecha:</strong> ${esc(fechaTexto)}</p>
-      <p><strong>Ubicación:</strong> ${esc(datos.ubicacion)}</p>
-      <p><strong>Responsable:</strong> ${esc(datos.responsable)}</p>
-      <p><strong>TurnoID:</strong> ${esc(datos.turnoId)}</p>
+      <div class="chombo-imp-encabezado">
+        <p><strong>Fecha:</strong> ${esc(fechaTexto)}</p>
+        <p><strong>Ubicación:</strong> ${esc(datos.ubicacion)}</p>
+        <p><strong>Responsable:</strong> ${esc(datos.responsable)}</p>
+        <p><strong>TurnoID:</strong> ${esc(datos.turnoId)}</p>
+      </div>
 
-      <table>
+      <table class="chombo-imp-tabla-detalles">
         <thead>
           <tr>
             <th>Módulo</th>
@@ -25437,31 +25580,44 @@ function construirReporteImpresionChombo(datos) {
             <th>Salidas</th>
           </tr>
         </thead>
+
         <tbody>
           ${filas}
         </tbody>
       </table>
 
-      <div class="chombo-imp-totales">
-        <div>
-          <span>Suma de Entradas</span>
-          <strong>${dinero(datos.totalEntradas)}</strong>
-        </div>
-        <div>
-          <span>Suma de Salidas</span>
-          <strong>${dinero(datos.totalSalidas)}</strong>
-        </div>
-        <div>
-          <span>Diferencia</span>
-          <strong>${dinero(datos.diferencia)}</strong>
-        </div>
-      </div>
+      <table class="chombo-imp-totales">
+
+        <thead>
+          <tr>
+            <th>Suma</th>
+            <th>Entradas</th>
+            <th>Salidas</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr>
+            <td>Suma</td>
+            <td>${dinero(entradas)}</td>
+            <td>${dinero(salidas)}</td>
+          </tr>
+
+          <tr class="chombo-imp-saldo-fila">
+            <td>Saldo</td>
+            <td></td>
+            <td>${dinero(saldo)}</td>
+          </tr>
+        </tbody>
+
+      </table>
 
       ${tablaCaja}
 
     </div>
   `;
 }
+
 
 function imprimirVistaCierreChombo() {
 
@@ -25470,10 +25626,9 @@ function imprimirVistaCierreChombo() {
     return;
   }
 
-  const contenido =
-    document.querySelector(
-      '#chomboImpVista .chombo-imp-hoja'
-    )?.outerHTML;
+  const contenido = document.querySelector(
+    '#chomboImpVista .chombo-imp-hoja'
+  )?.outerHTML;
 
   if (!contenido) {
     alert('No existe una vista previa para imprimir.');
@@ -25488,73 +25643,179 @@ function imprimirVistaCierreChombo() {
   }
 
   ventana.document.open();
+
   ventana.document.write(`
     <!DOCTYPE html>
     <html lang="es">
+
     <head>
       <meta charset="UTF-8">
       <title>Chombo - Cierre de turno</title>
+
       <style>
         @page {
-          size: letter portrait;
-          margin:12mm;
+          size:letter portrait;
+          margin:7mm;
         }
+
+        * {
+          box-sizing:border-box;
+        }
+
+        html, body {
+          margin:0;
+          padding:0;
+          width:100%;
+          background:white;
+        }
+
         body {
           font-family:Arial,sans-serif;
           color:#111827;
-          font-size:11px;
+          font-size:9px;
         }
-        h2,h3 {
-          text-align:center;
+
+        .chombo-imp-hoja {
+          width:100%;
+          max-width:100%;
+          margin:0;
+          padding:0;
         }
-        h2 {
-          font-size:18px;
+
+        .chombo-imp-hoja h2 {
+          font-size:13px;
+          margin:0 0 5px;
         }
-        table {
+
+        .chombo-imp-encabezado {
+          margin-bottom:5px;
+        }
+
+        .chombo-imp-encabezado p {
+          margin:2px 0;
+          font-size:9px;
+        }
+
+        .chombo-imp-hoja table {
           width:100%;
           border-collapse:collapse;
-          margin:12px 0;
-          font-size:10px;
+          table-layout:fixed;
+          margin:4px 0;
         }
-        th,td {
+
+        .chombo-imp-hoja th,
+        .chombo-imp-hoja td {
           border:1px solid #888;
-          padding:5px;
+          padding:2px 3px;
+          font-size:8px;
+          line-height:1.1;
+          overflow-wrap:anywhere;
         }
-        th {
+
+        .chombo-imp-hoja th {
           background:#e5e7eb;
         }
+
         .chombo-imp-num {
           text-align:right;
+          white-space:nowrap;
         }
+
         .chombo-imp-totales {
-          margin:16px 0 16px auto;
-          width:300px;
+          width:48%;
+          margin:5px 0 3px auto;
         }
-        .chombo-imp-totales div {
-          display:flex;
-          justify-content:space-between;
-          border-bottom:1px solid #ccc;
-          padding:6px;
+
+        .chombo-imp-totales th,
+        .chombo-imp-totales td {
+          text-align:center;
+          font-size:8px;
+          padding:3px;
         }
+
         .chombo-imp-arqueo {
+          margin-top:3px;
           break-inside:avoid;
-          margin-top:20px;
+          page-break-inside:avoid;
         }
+
+        .chombo-imp-arqueo h3 {
+          font-size:11px;
+          margin:4px 0 3px;
+          text-align:center;
+        }
+
+        .chombo-imp-tabla-arqueo {
+          width:100%;
+          table-layout:fixed;
+          margin:2px 0;
+        }
+
+        .chombo-imp-tabla-arqueo th,
+        .chombo-imp-tabla-arqueo td {
+          text-align:center !important;
+          font-size:8px;
+          padding:3px 1px;
+          white-space:nowrap;
+        }
+
+        .chombo-imp-saldo-efectivo {
+          display:flex;
+          justify-content:flex-end;
+          align-items:center;
+          gap:20px;
+          margin-top:4px;
+          padding:4px 7px;
+          font-size:9px;
+          font-weight:bold;
+          border:1px solid #aaa;
+          background:#eef4ff;
+        }
+
         tr {
           break-inside:avoid;
+          page-break-inside:avoid;
+        }
+
+        thead {
+          display:table-header-group;
+        }
+
+        @media print {
+          html, body {
+            width:100%;
+            height:auto;
+          }
+
+          .chombo-imp-hoja {
+            width:100%;
+          }
+
+          .chombo-imp-arqueo {
+            break-inside:avoid;
+            page-break-inside:avoid;
+          }
+
+          th {
+            -webkit-print-color-adjust:exact;
+            print-color-adjust:exact;
+          }
         }
       </style>
+
     </head>
+
     <body>
       ${contenido}
     </body>
+
     </html>
   `);
+
   ventana.document.close();
   ventana.focus();
   ventana.print();
 }
-
 
 /* ======================================================
    INICIAR APLICACIÓN
