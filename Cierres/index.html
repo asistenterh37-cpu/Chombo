@@ -3906,7 +3906,7 @@ const SCRIPT_URL =
 <button
   class="btn btn-print"
   type="button"
-  onclick="imprimirOperacionesTurno()"
+  onclick="abrirImpresionCierreChombo()"
 >
   Imprimir
 </button>
@@ -24956,6 +24956,544 @@ function activarCalculadoraControlVentas() {
 
   });
 
+}
+
+/* ======================================================
+   CHOMBO - IMPRESION DE CIERRES POR TURNO
+   Lectura de las hojas Cierres y Caja
+   Sin modificar datos de Google Sheets
+====================================================== */
+
+let impresionCierreActual = null;
+
+const escaparImpresionChombo = valor =>
+  String(valor ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[c]));
+
+function dineroImpresionChombo(valor) {
+  return Number(valor || 0).toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+function abrirImpresionCierreChombo() {
+
+  document.getElementById('modalImpresionChombo')?.remove();
+
+  const hoy = new Date();
+  const fechaLocal = [
+    hoy.getFullYear(),
+    String(hoy.getMonth() + 1).padStart(2, '0'),
+    String(hoy.getDate()).padStart(2, '0')
+  ].join('-');
+
+  const modal = document.createElement('div');
+  modal.id = 'modalImpresionChombo';
+
+  modal.innerHTML = `
+    <div class="chombo-imp-panel">
+      <div class="chombo-imp-cabecera">
+        <h2>Imprimir cierre de turno</h2>
+        <button type="button"
+          onclick="cerrarImpresionCierreChombo()">
+          Cerrar ✕
+        </button>
+      </div>
+
+      <div class="chombo-imp-filtros">
+        <label>
+          Fecha
+          <input id="chomboImpFecha"
+            type="date"
+            value="${fechaLocal}"
+            onchange="cargarTurnosImpresionChombo()">
+        </label>
+
+        <label>
+          TurnoID
+          <select id="chomboImpTurno"
+            onchange="consultarImpresionChombo()">
+            <option value="">Seleccionar turno</option>
+          </select>
+        </label>
+      </div>
+
+      <div id="chomboImpMensaje"
+        style="padding:12px;color:#667085">
+        Selecciona un turno para ver su cierre.
+      </div>
+
+      <div id="chomboImpVista"></div>
+
+      <div class="chombo-imp-acciones">
+        <button type="button"
+          id="chomboImpBoton"
+          disabled
+          onclick="imprimirVistaCierreChombo()">
+          Imprimir
+        </button>
+      </div>
+    </div>
+  `;
+
+  const estilos = document.createElement('style');
+  estilos.textContent = `
+    #modalImpresionChombo {
+      position:fixed;
+      inset:0;
+      z-index:999999;
+      background:rgba(0,0,0,.55);
+      padding:20px;
+      overflow:auto;
+    }
+    #modalImpresionChombo * {
+      box-sizing:border-box;
+    }
+    .chombo-imp-panel {
+      max-width:1150px;
+      margin:20px auto;
+      background:white;
+      border-radius:12px;
+      padding:22px;
+      color:#172033;
+    }
+    .chombo-imp-cabecera {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+    }
+    .chombo-imp-cabecera button {
+      background:#475467;
+      color:white;
+      border:0;
+      padding:10px;
+      border-radius:7px;
+      cursor:pointer;
+    }
+    .chombo-imp-filtros {
+      display:flex;
+      gap:16px;
+      margin:20px 0;
+      flex-wrap:wrap;
+    }
+    .chombo-imp-filtros label {
+      flex:1;
+      min-width:220px;
+      font-weight:bold;
+    }
+    .chombo-imp-filtros input,
+    .chombo-imp-filtros select {
+      display:block;
+      width:100%;
+      padding:11px;
+      margin-top:7px;
+      border:1px solid #cbd5e1;
+      border-radius:8px;
+      background:white;
+    }
+    .chombo-imp-hoja {
+      width:100%;
+      background:white;
+      color:#111827;
+    }
+    .chombo-imp-hoja h2,
+    .chombo-imp-hoja h3 {
+      text-align:center;
+      margin:16px 0;
+    }
+    .chombo-imp-hoja table {
+      width:100%;
+      border-collapse:collapse;
+      margin:12px 0;
+      font-size:12px;
+    }
+    .chombo-imp-hoja th,
+    .chombo-imp-hoja td {
+      border:1px solid #9ca3af;
+      padding:7px;
+    }
+    .chombo-imp-hoja th {
+      background:#e5e7eb;
+    }
+    .chombo-imp-num {
+      text-align:right;
+      white-space:nowrap;
+    }
+    .chombo-imp-totales {
+      margin:18px 0;
+      margin-left:auto;
+      max-width:360px;
+    }
+    .chombo-imp-totales div {
+      display:flex;
+      justify-content:space-between;
+      border-bottom:1px solid #ddd;
+      padding:8px;
+    }
+    .chombo-imp-totales div:last-child {
+      font-weight:bold;
+      background:#eef4ff;
+    }
+    .chombo-imp-acciones {
+      display:flex;
+      justify-content:flex-end;
+      margin-top:20px;
+    }
+    .chombo-imp-acciones button {
+      background:#1769e0;
+      color:white;
+      border:0;
+      border-radius:8px;
+      padding:12px 28px;
+      font-weight:bold;
+      cursor:pointer;
+    }
+    .chombo-imp-acciones button:disabled {
+      opacity:.4;
+      cursor:not-allowed;
+    }
+    .chombo-imp-arqueo {
+      break-inside:avoid;
+    }
+  `;
+
+  modal.appendChild(estilos);
+  document.body.appendChild(modal);
+
+  impresionCierreActual = null;
+  cargarTurnosImpresionChombo();
+}
+
+function cerrarImpresionCierreChombo() {
+  document.getElementById('modalImpresionChombo')?.remove();
+  impresionCierreActual = null;
+}
+
+async function cargarTurnosImpresionChombo() {
+
+  const fecha = document.getElementById('chomboImpFecha').value;
+  const select = document.getElementById('chomboImpTurno');
+  const mensaje = document.getElementById('chomboImpMensaje');
+
+  impresionCierreActual = null;
+  document.getElementById('chomboImpVista').innerHTML = '';
+  document.getElementById('chomboImpBoton').disabled = true;
+
+  select.innerHTML = '<option value="">Cargando turnos...</option>';
+  mensaje.textContent = '';
+
+  try {
+
+    const respuesta = await jsonpRequest(
+      'turnos_impresion',
+      {fecha}
+    );
+
+    if (!respuesta.ok) {
+      throw new Error(respuesta.message || 'Error al consultar.');
+    }
+
+    if (document.getElementById('chomboImpFecha')?.value !== fecha) {
+      return;
+    }
+
+    select.innerHTML = '<option value="">Seleccionar turno</option>';
+
+    (respuesta.turnos || []).forEach(turno => {
+
+      const opcion = document.createElement('option');
+      opcion.value = turno.turnoId;
+      opcion.textContent = [
+        turno.turnoId,
+        turno.ubicacion,
+        turno.responsable
+      ].filter(Boolean).join(' - ');
+
+      select.appendChild(opcion);
+
+    });
+
+    if (!respuesta.turnos?.length) {
+      mensaje.textContent =
+        'No existen turnos registrados para esta fecha.';
+    }
+
+  } catch (error) {
+
+    select.innerHTML =
+      '<option value="">Seleccionar turno</option>';
+    mensaje.textContent = error.message;
+
+  }
+}
+
+async function consultarImpresionChombo() {
+
+  const fecha = document.getElementById('chomboImpFecha').value;
+  const turnoId = document.getElementById('chomboImpTurno').value;
+
+  const vista = document.getElementById('chomboImpVista');
+  const mensaje = document.getElementById('chomboImpMensaje');
+  const boton = document.getElementById('chomboImpBoton');
+
+  vista.innerHTML = '';
+  boton.disabled = true;
+  impresionCierreActual = null;
+
+  if (!turnoId) {
+    mensaje.textContent = 'Selecciona un TurnoID.';
+    return;
+  }
+
+  mensaje.textContent = 'Consultando cierre y arqueo de caja...';
+
+  try {
+
+    const respuesta = await jsonpRequest(
+      'impresion_cierre',
+      {fecha, turnoId}
+    );
+
+    if (!respuesta.ok) {
+      throw new Error(respuesta.message || 'No se pudo consultar.');
+    }
+
+    if (
+      document.getElementById('chomboImpFecha')?.value !== fecha ||
+      document.getElementById('chomboImpTurno')?.value !== turnoId
+    ) {
+      return;
+    }
+
+    impresionCierreActual = respuesta;
+    vista.innerHTML = construirReporteImpresionChombo(respuesta);
+
+    mensaje.textContent = '';
+    boton.disabled = false;
+
+  } catch (error) {
+    mensaje.textContent = error.message;
+  }
+}
+
+function construirReporteImpresionChombo(datos) {
+
+  const esc = escaparImpresionChombo;
+  const dinero = dineroImpresionChombo;
+
+  const fecha = String(datos.fecha || '');
+  const fechaTexto = /^\d{4}-\d{2}-\d{2}$/.test(fecha)
+    ? fecha.split('-').reverse().join('/')
+    : fecha;
+
+  const filas = (datos.detalles || []).map(item => `
+    <tr>
+      <td>${esc(item.modulo)}</td>
+      <td>${esc(item.movimiento)}</td>
+      <td>${esc(item.descripcion)}</td>
+      <td class="chombo-imp-num">${dinero(item.parcial)}</td>
+      <td class="chombo-imp-num">${dinero(item.entrada)}</td>
+      <td class="chombo-imp-num">${dinero(item.salida)}</td>
+    </tr>
+  `).join('');
+
+  let tablaCaja = '';
+
+  if (datos.arqueo) {
+
+    const cantidades = datos.arqueo.cantidades || [];
+
+    const columnas = cantidades.map(item =>
+      `<th>${esc(item.denominacion)}</th>`
+    ).join('');
+
+    const valores = cantidades.map(item =>
+      `<td class="chombo-imp-num">${esc(item.cantidad)}</td>`
+    ).join('');
+
+    const totalBilletes = cantidades.reduce(
+      (s, item) => s + Number(item.cantidad || 0),
+      0
+    );
+
+    const totalDinero = cantidades.reduce(
+      (s, item) =>
+        s + Number(item.denominacion) * Number(item.cantidad || 0),
+      0
+    );
+
+    tablaCaja = `
+      <div class="chombo-imp-arqueo">
+        <h3>Arqueo de caja</h3>
+        <table>
+          <thead>
+            <tr>${columnas}</tr>
+          </thead>
+          <tbody>
+            <tr>${valores}</tr>
+          </tbody>
+        </table>
+
+        <p><strong>Total de piezas:</strong> ${totalBilletes}</p>
+        <p><strong>Total efectivo:</strong> ${dinero(totalDinero)}</p>
+      </div>
+    `;
+
+  } else {
+
+    tablaCaja = `
+      <div class="chombo-imp-arqueo">
+        <h3>Arqueo de caja</h3>
+        <p>No existe arqueo guardado para este TurnoID.</p>
+      </div>
+    `;
+
+  }
+
+  return `
+    <div class="chombo-imp-hoja">
+
+      <h2>CHOMBO - CIERRE DE TURNO</h2>
+
+      <p><strong>Fecha:</strong> ${esc(fechaTexto)}</p>
+      <p><strong>Ubicación:</strong> ${esc(datos.ubicacion)}</p>
+      <p><strong>Responsable:</strong> ${esc(datos.responsable)}</p>
+      <p><strong>TurnoID:</strong> ${esc(datos.turnoId)}</p>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Módulo</th>
+            <th>Movimiento</th>
+            <th>Descripción</th>
+            <th>Parcial</th>
+            <th>Entradas</th>
+            <th>Salidas</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${filas}
+        </tbody>
+      </table>
+
+      <div class="chombo-imp-totales">
+        <div>
+          <span>Suma de Entradas</span>
+          <strong>${dinero(datos.totalEntradas)}</strong>
+        </div>
+        <div>
+          <span>Suma de Salidas</span>
+          <strong>${dinero(datos.totalSalidas)}</strong>
+        </div>
+        <div>
+          <span>Diferencia</span>
+          <strong>${dinero(datos.diferencia)}</strong>
+        </div>
+      </div>
+
+      ${tablaCaja}
+
+    </div>
+  `;
+}
+
+function imprimirVistaCierreChombo() {
+
+  if (!impresionCierreActual) {
+    alert('Primero selecciona un cierre.');
+    return;
+  }
+
+  const contenido =
+    document.querySelector(
+      '#chomboImpVista .chombo-imp-hoja'
+    )?.outerHTML;
+
+  if (!contenido) {
+    alert('No existe una vista previa para imprimir.');
+    return;
+  }
+
+  const ventana = window.open('', '_blank');
+
+  if (!ventana) {
+    alert('Permite las ventanas emergentes para imprimir.');
+    return;
+  }
+
+  ventana.document.open();
+  ventana.document.write(`
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <title>Chombo - Cierre de turno</title>
+      <style>
+        @page {
+          size: letter portrait;
+          margin:12mm;
+        }
+        body {
+          font-family:Arial,sans-serif;
+          color:#111827;
+          font-size:11px;
+        }
+        h2,h3 {
+          text-align:center;
+        }
+        h2 {
+          font-size:18px;
+        }
+        table {
+          width:100%;
+          border-collapse:collapse;
+          margin:12px 0;
+          font-size:10px;
+        }
+        th,td {
+          border:1px solid #888;
+          padding:5px;
+        }
+        th {
+          background:#e5e7eb;
+        }
+        .chombo-imp-num {
+          text-align:right;
+        }
+        .chombo-imp-totales {
+          margin:16px 0 16px auto;
+          width:300px;
+        }
+        .chombo-imp-totales div {
+          display:flex;
+          justify-content:space-between;
+          border-bottom:1px solid #ccc;
+          padding:6px;
+        }
+        .chombo-imp-arqueo {
+          break-inside:avoid;
+          margin-top:20px;
+        }
+        tr {
+          break-inside:avoid;
+        }
+      </style>
+    </head>
+    <body>
+      ${contenido}
+    </body>
+    </html>
+  `);
+  ventana.document.close();
+  ventana.focus();
+  ventana.print();
 }
 
 
