@@ -25304,45 +25304,102 @@ function construirReporteImpresionChombo(datos) {
     </tr>
   `).join('');
 
+
   let tablaCaja = '';
 
   if (datos.arqueo) {
 
     const cantidades = datos.arqueo.cantidades || [];
 
-    const columnas = cantidades.map(item =>
-      `<th>${esc(item.denominacion)}</th>`
-    ).join('');
+    // Denominaciones y cantidades del turno seleccionado
+    const denominaciones = [
+      500, 200, 100, 50, 20, 10, 5, 2, 1
+    ];
 
-    const valores = cantidades.map(item =>
-      `<td class="chombo-imp-num">${esc(item.cantidad)}</td>`
-    ).join('');
+    const lista = denominaciones.map(denominacion => {
 
-    const totalBilletes = cantidades.reduce(
-      (s, item) => s + Number(item.cantidad || 0),
-      0
+      const item = cantidades.find(
+        x => Number(x.denominacion) === denominacion
+      );
+
+      const cantidad = Number(item?.cantidad || 0);
+
+      return {
+        denominacion,
+        cantidad,
+        valor: denominacion * cantidad
+      };
+
+    });
+
+    const totalCantidad = lista.reduce(
+      (suma, item) => suma + item.cantidad, 0
     );
 
-    const totalDinero = cantidades.reduce(
-      (s, item) =>
-        s + Number(item.denominacion) * Number(item.cantidad || 0),
-      0
+    const totalValor = lista.reduce(
+      (suma, item) => suma + item.valor, 0
     );
+
+    const columnas = lista.map(item => `
+      <th style="text-align:center;">
+        ${item.denominacion}
+      </th>
+    `).join('');
+
+    const cantidadesHTML = lista.map(item => `
+      <td style="text-align:center;">
+        ${item.cantidad}
+      </td>
+    `).join('');
+
+    const valoresHTML = lista.map(item => `
+      <td style="text-align:center;">
+        ${dinero(item.valor)}
+      </td>
+    `).join('');
 
     tablaCaja = `
       <div class="chombo-imp-arqueo">
+
         <h3>Arqueo de caja</h3>
-        <table>
+
+        <table style="
+          width:100%;
+          border-collapse:collapse;
+          table-layout:fixed;
+          text-align:center;
+        ">
+
           <thead>
-            <tr>${columnas}</tr>
+            <tr>
+              <th style="text-align:center;">Billetes</th>
+              ${columnas}
+              <th style="text-align:center;">Total</th>
+            </tr>
           </thead>
+
           <tbody>
-            <tr>${valores}</tr>
+
+            <tr>
+              <th style="text-align:center;">Cantidad</th>
+              ${cantidadesHTML}
+              <th style="text-align:center;">
+                ${totalCantidad}
+              </th>
+            </tr>
+
+            <tr>
+              <th style="text-align:center;">Valor</th>
+              ${valoresHTML}
+              <th style="text-align:center;">
+                ${dinero(totalValor)}
+              </th>
+            </tr>
+
           </tbody>
+
         </table>
 
-        <p><strong>Total de piezas:</strong> ${totalBilletes}</p>
-        <p><strong>Total efectivo:</strong> ${dinero(totalDinero)}</p>
       </div>
     `;
 
@@ -25357,6 +25414,8 @@ function construirReporteImpresionChombo(datos) {
 
   }
 
+
+  
   return `
     <div class="chombo-imp-hoja">
 
