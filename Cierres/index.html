@@ -3123,7 +3123,7 @@ tr{
 <script>
 
 const SCRIPT_URL =
-'https://script.google.com/macros/s/AKfycbxds4WsNW_OwZKaz7TRZRuZBElMb-n_lGYz5mjdy_JxPVYoYbXtDKPb0ZQd1Tnk9A/exec';
+'https://script.google.com/macros/s/AKfycbwgqMKRB6FvKGD3-flQNnYq2XquvuJiICWbZjZr0wwC9VUpgrDX7syXiNgKV06NVCJw/exec';
 
 </script>
 
@@ -3893,23 +3893,23 @@ const SCRIPT_URL =
   Notas
 </button>
   
-  <button
-    class="btn btn-print"
-    type="button"
-    onclick="imprimirOperacionesTurno()"
-  >
-    Imprimir
-  </button>
+  
+<button
+  id="guardarTotalesTurnoBtn"
+  class="btn btn-primary"
+  type="button"
+  onclick="guardarTotalesTurno()"
+>
+  Guardar
+</button>
 
-
-  <button
-    id="guardarTotalesTurnoBtn"
-    class="btn btn-primary"
-    type="button"
-    onclick="guardarTotalesTurno()"
-  >
-    Guardar
-  </button>
+<button
+  class="btn btn-print"
+  type="button"
+  onclick="imprimirOperacionesTurno()"
+>
+  Imprimir
+</button>
 
 
   <button
