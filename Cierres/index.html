@@ -3123,7 +3123,7 @@ tr{
 <script>
 
 const SCRIPT_URL =
-'https://script.google.com/macros/s/AKfycbyMNlBK14kT50J06tp_pSpiXIOSfrrEJCp7FZlV3rKhW6UF5pEgmAESC816NPj4xuh5/exec';
+'https://script.google.com/macros/s/AKfycbxMTO8Sq1N-DHhDe9uK9Fx5ECza_pD9c5QwG9dnowpSvGj_yAplL4W0VMH5vfwCTlow/exec';
 
 </script>
 
@@ -3729,131 +3729,133 @@ const SCRIPT_URL =
 <!-- ======================================================
  MODAL CONSULTA DE CAJA
 ====================================================== -->
-<div
- id="modalConsultaCaja"
- style="
- display:none;
- position:fixed;
- inset:0;
- background:rgba(15,23,42,.58);
- z-index:9999;
- align-items:center;
- justify-content:center;
- padding:20px;
- "
->
- <div
-  style="
-  width:min(760px,96vw);
-  background:#fff;
-  border-radius:16px;
-  box-shadow:0 20px 60px rgba(0,0,0,.25);
-  overflow:hidden;
-  "
- >
 
-  <div
-   style="
-   display:flex;
-   justify-content:space-between;
-   align-items:center;
-   padding:18px 20px;
-   border-bottom:1px solid #d7dce5;
-   "
-  >
-   <div>
-    <div
-     style="
-     font-size:22px;
-     font-weight:900;
-     "
-    >
-     Arqueo de caja
-    </div>
-
-    <div
-     id="cajaDetalleTurno"
-     style="
-     margin-top:4px;
-     font-size:13px;
-     color:#667085;
-     "
-    >
-    </div>
-   </div>
-
-   <button
-    type="button"
-    onclick="cerrarConsultaCaja()"
-    style="
-    border:0;
-    background:transparent;
-    font-size:26px;
-    font-weight:900;
-    cursor:pointer;
-    "
-   >
-    ×
-   </button>
-
-  </div>
-
-  <div
-   style="
-   padding:20px;
-   overflow-x:auto;
-   "
-  >
-
-   <table
-    style="
-    width:100%;
-    border-collapse:collapse;
-    text-align:center;
-    "
-   >
-    <thead>
-     <tr>
-      <th>500</th>
-      <th>200</th>
-      <th>100</th>
-      <th>50</th>
-      <th>20</th>
-      <th>10</th>
-      <th>5</th>
-      <th>2</th>
-      <th>1</th>
-      <th>Total</th>
-     </tr>
-    </thead>
-
-    <tbody>
-     <tr id="cajaDetalleCantidades">
-     </tr>
-    </tbody>
-   </table>
-
-  </div>
-
-  <div
-   style="
-   display:flex;
-   justify-content:flex-end;
-   padding:0 20px 20px;
-   "
-  >
-   <button
-    type="button"
-    class="btn btn-print"
-    onclick="cerrarConsultaCaja()"
-   >
-    Cerrar
-   </button>
-  </div>
-
- </div>
-</div>  
 <!-- ======================================================
+ MODAL CONSULTA DE CAJA - HOY Y AYER
+====================================================== -->
+
+<div id="modalConsultaCaja"
+     style="
+       display:none;
+       position:fixed;
+       inset:0;
+       background:rgba(15,23,42,.58);
+       z-index:9999;
+       align-items:center;
+       justify-content:center;
+       padding:16px;
+     ">
+
+  <div style="
+    width:min(1050px,98vw);
+    max-height:90vh;
+    background:#fff;
+    border-radius:16px;
+    box-shadow:0 20px 60px rgba(0,0,0,.25);
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+  ">
+
+    <div style="
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:18px 20px;
+      border-bottom:1px solid #d7dce5;
+    ">
+
+      <div>
+        <div style="
+          font-size:22px;
+          font-weight:900;
+        ">
+          Arqueo de caja
+        </div>
+
+        <div id="cajaDetalleTurno"
+             style="
+               margin-top:5px;
+               font-size:13px;
+               color:#667085;
+             ">
+        </div>
+      </div>
+
+      <button type="button"
+              onclick="cerrarConsultaCaja()"
+              style="
+                border:0;
+                background:transparent;
+                font-size:26px;
+                font-weight:900;
+                cursor:pointer;
+              ">
+        ×
+      </button>
+
+    </div>
+
+    <div style="
+      padding:18px 20px;
+      overflow:auto;
+      flex:1;
+    ">
+
+      <table style="
+        width:100%;
+        min-width:850px;
+        border-collapse:collapse;
+        table-layout:fixed;
+        text-align:center;
+        font-size:13px;
+      ">
+
+        <thead>
+          <tr style="background:#e7ebf1;">
+            <th style="padding:10px 5px;">Billetes</th>
+            <th>500</th>
+            <th>200</th>
+            <th>100</th>
+            <th>50</th>
+            <th>20</th>
+            <th>10</th>
+            <th>5</th>
+            <th>2</th>
+            <th>1</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <tr id="cajaDetalleCantidades"></tr>
+          <tr id="cajaDetalleValores"></tr>
+        </tbody>
+
+      </table>
+
+    </div>
+
+    <div style="
+      display:flex;
+      justify-content:flex-end;
+      padding:12px 20px 20px;
+      border-top:1px solid #e7eaf0;
+    ">
+
+      <button type="button"
+              class="btn btn-print"
+              onclick="cerrarConsultaCaja()">
+        Cerrar
+      </button>
+
+    </div>
+
+  </div>
+</div>
+
+  <!-- ======================================================
      BARRA TURNO ACTIVO
 ====================================================== -->
 
@@ -7941,222 +7943,216 @@ actualizarResumenSaldos = function(...argumentos){
 ====================================================== */
 
 /* ======================================================
- CONSULTA DE LOS ULTIMOS 3 ARQUEOS DE CAJA
+ ARQUEOS DE CAJA - HOY Y AYER
+ DATOS DIRECTAMENTE DE HOJA CAJA
 ====================================================== */
 
 let ultimosArqueosCaja = [];
 
+const DENOMINACIONES_CAJA = [
+  500, 200, 100, 50, 20, 10, 5, 2, 1
+];
 
 /* ======================================================
- CARGAR ULTIMOS 3 TURNOS DE CAJA
+ CARGAR ARQUEOS DE HOY Y AYER
 ====================================================== */
-async function cargarUltimosArqueosCaja(){
 
- const select =
-  $('cajaTurnoSelect');
+async function cargarUltimosArqueosCaja() {
 
- if(!select){
-  return;
- }
+  const select = $('cajaTurnoSelect');
 
- select.innerHTML =
-  '<option value="">Caja - últimos turnos</option>';
+  if (!select) return;
 
- try{
+  select.innerHTML =
+    '<option value="">Cargando arqueos...</option>';
 
- if(
- !turnoActivo ||
- !turnoActivo.ubicacion
-){
- select.innerHTML =
- '<option value="">Caja anterior</option>';
+  ultimosArqueosCaja = [];
 
- ultimosArqueosCaja = [];
-
- return;
-}
-
-const data =
-await jsonpRequest(
- 'caja_ultimos',
- {
-  ubicacion:
-  turnoActivo.ubicacion
- }
-);
-
-  if(
-   !data ||
-   data.ok !== true
-  ){
-   throw new Error(
-    data &&
-    data.message
-    ?
-    data.message
-    :
-    'No se pudieron cargar los arqueos.'
-   );
+  if (!turnoActivo || !turnoActivo.ubicacion) {
+    select.innerHTML =
+      '<option value="">Caja anterior</option>';
+    return;
   }
 
-  ultimosArqueosCaja =
-   Array.isArray(
-    data.turnos
-   )
-   ?
-   data.turnos
-   :
-   [];
+  try {
 
-  ultimosArqueosCaja.forEach(
-   turno => {
-
-    const option =
-     document.createElement(
-      'option'
-     );
-
-    option.value =
-     turno.turnoId;
-
-    option.textContent =
-     turno.turnoId
-     +
-     ' | '
-     +
-     turno.ubicacion
-     +
-     ' | '
-     +
-     turno.fecha;
-
-    select.appendChild(
-     option
+    const data = await jsonpRequest(
+      'caja_ultimos',
+      { ubicacion: turnoActivo.ubicacion }
     );
 
-   }
-  );
+    if (!data || data.ok !== true) {
+      throw new Error(
+        data?.message ||
+        'No se pudieron consultar los arqueos.'
+      );
+    }
 
- }
- catch(error){
+    ultimosArqueosCaja = Array.isArray(data.turnos)
+      ? data.turnos : [];
 
-  console.error(
-   'ERROR CARGANDO CAJA:',
-   error
-  );
+    select.innerHTML =
+      '<option value="">Seleccionar arqueo</option>';
 
- }
+    ultimosArqueosCaja.forEach(arqueo => {
+
+      const option = document.createElement('option');
+
+      option.value = arqueo.turnoId;
+
+      option.textContent = [
+        arqueo.fecha,
+        arqueo.turnoId,
+        arqueo.ubicacion,
+        arqueo.responsable
+      ].join(' | ');
+
+      select.appendChild(option);
+
+    });
+
+    if (!ultimosArqueosCaja.length) {
+      select.innerHTML =
+        '<option value="">Sin arqueos de hoy o ayer</option>';
+    }
+
+  } catch (error) {
+
+    console.error('ERROR CONSULTA CAJA:', error);
+
+    select.innerHTML =
+      '<option value="">Error al consultar caja</option>';
+
+    toast(
+      error.message || 'No fue posible consultar Caja.',
+      false
+    );
+
+  }
 }
-
 
 /* ======================================================
  MOSTRAR ARQUEO SELECCIONADO
 ====================================================== */
-function verArqueoCajaSeleccionado(){
 
- const select =
-  $('cajaTurnoSelect');
+function verArqueoCajaSeleccionado() {
 
- if(
-  !select ||
-  !select.value
- ){
-  toast(
-   'Selecciona uno de los últimos turnos.',
-   false
-  );
-  return;
- }
+  const select = $('cajaTurnoSelect');
 
- const arqueo =
-  ultimosArqueosCaja.find(
-   item =>
-   item.turnoId ===
-   select.value
+  if (!select || !select.value) {
+    toast('Selecciona un arqueo de caja.', false);
+    return;
+  }
+
+  const arqueo = ultimosArqueosCaja.find(
+    item => item.turnoId === select.value
   );
 
- if(!arqueo){
-  toast(
-   'No se encontró el arqueo seleccionado.',
-   false
+  if (!arqueo) {
+    toast('No se encontró el arqueo.', false);
+    return;
+  }
+
+  const encabezado = $('cajaDetalleTurno');
+
+  encabezado.textContent = [
+    'Turno: ' + arqueo.turnoId,
+    arqueo.ubicacion,
+    arqueo.responsable,
+    arqueo.fecha
+  ].join(' | ');
+
+  const cantidad = DENOMINACIONES_CAJA.map(
+    denominacion => Number(
+      arqueo['d' + denominacion] || 0
+    )
   );
-  return;
- }
 
- const encabezado =
-  $('cajaDetalleTurno');
+  // Calcular importes directamente desde cantidades.
+  const valores = cantidad.map(
+    (n, i) => n * DENOMINACIONES_CAJA[i]
+  );
 
- if(encabezado){
+  const sumaCantidad = cantidad.reduce(
+    (total, n) => total + n, 0
+  );
 
-  encabezado.textContent =
-   'Turno: '
-   +
-   arqueo.turnoId
-   +
-   ' | '
-   +
-   arqueo.ubicacion
-   +
-   ' | '
-   +
-   arqueo.responsable
-   +
-   ' | '
-   +
-   arqueo.fecha;
+  const sumaValor = valores.reduce(
+    (total, n) => total + n, 0
+  );
 
- }
+  const formatoCantidad = valor =>
+    Number(valor).toLocaleString('en-US', {
+      maximumFractionDigits: 0
+    });
 
- const fila =
-  $('cajaDetalleCantidades');
+  const formatoMoneda = valor =>
+    Number(valor).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
 
- if(fila){
+  const estiloCelda = `
+    padding:10px 5px;
+    border:1px solid #cbd1da;
+    text-align:center;
+  `;
 
-  fila.innerHTML =
-   `
-   <td>${arqueo.d500}</td>
-   <td>${arqueo.d200}</td>
-   <td>${arqueo.d100}</td>
-   <td>${arqueo.d50}</td>
-   <td>${arqueo.d20}</td>
-   <td>${arqueo.d10}</td>
-   <td>${arqueo.d5}</td>
-   <td>${arqueo.d2}</td>
-   <td>${arqueo.d1}</td>
-   <td style="font-weight:900;color:#1769e0;">
-    ${arqueo.total}
-   </td>
-   `;
+  const filaCantidades = $('cajaDetalleCantidades');
+  const filaValores = $('cajaDetalleValores');
 
- }
+  filaCantidades.innerHTML = `
+    <td style="${estiloCelda}font-weight:800;">
+      Cantidad
+    </td>
+    ${cantidad.map(n => `
+      <td style="${estiloCelda}">
+        ${formatoCantidad(n)}
+      </td>
+    `).join('')}
+    <td style="${estiloCelda}
+               font-weight:900;
+               color:#1769e0;">
+      ${formatoCantidad(sumaCantidad)}
+    </td>
+  `;
 
- const modal =
-  $('modalConsultaCaja');
+  filaValores.innerHTML = `
+    <td style="${estiloCelda}font-weight:800;">
+      Valor
+    </td>
+    ${valores.map(n => `
+      <td style="${estiloCelda}">
+        ${formatoMoneda(n)}
+      </td>
+    `).join('')}
+    <td style="${estiloCelda}
+               font-weight:900;
+               color:#1769e0;
+               background:#eef4ff;">
+      ${formatoMoneda(sumaValor)}
+    </td>
+  `;
 
- if(modal){
-  modal.style.display =
-   'flex';
- }
+  $('modalConsultaCaja').style.display = 'flex';
 
 }
 
-
 /* ======================================================
- CERRAR CONSULTA CAJA
+ CERRAR MODAL ARQUEO DE CAJA
 ====================================================== */
-function cerrarConsultaCaja(){
 
- const modal =
-  $('modalConsultaCaja');
+function cerrarConsultaCaja() {
 
- if(modal){
-  modal.style.display =
-   'none';
- }
+  const modal = $('modalConsultaCaja');
+
+  if (modal) {
+    modal.style.display = 'none';
+  }
 
 }
 
-/* ======================================================
+  /* ======================================================
  ULTIMOS 3 SALDOS DE LA UBICACION ACTUAL
 ====================================================== */
 let ultimosSaldosUbicacion = [];
