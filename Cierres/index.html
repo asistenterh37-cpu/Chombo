@@ -3123,7 +3123,7 @@ tr{
 <script>
 
 const SCRIPT_URL =
-'https://script.google.com/macros/s/AKfycbwgqMKRB6FvKGD3-flQNnYq2XquvuJiICWbZjZr0wwC9VUpgrDX7syXiNgKV06NVCJw/exec';
+'https://script.google.com/macros/s/AKfycbyMNlBK14kT50J06tp_pSpiXIOSfrrEJCp7FZlV3rKhW6UF5pEgmAESC816NPj4xuh5/exec';
 
 </script>
 
@@ -14429,16 +14429,17 @@ async function guardarTotalesTurno(){
       salida:0
     },
 
-    {
-      descripcion:
-        'Efectivo',
+     {
+      descripcion:'Efectivo',
 
-      parcial:
-        valorCampo(
-          'opPagoEfectivo'
-        ),
+      parcial:valorCampo(
+        'opPagoEfectivo'
+      ),
 
-      entrada:0,
+      entrada:valorCampo(
+        'opPagoEfectivo'
+      ),
+
       salida:0
     },
 
@@ -14759,16 +14760,11 @@ async function guardarTotalesTurno(){
       ]
     },
 
-    {
-      descripcion:'Otro 1',
+      {
+      descripcion:'Otro',
       nombres:[
-        'Otro 1'
-      ]
-    },
-
-    {
-      descripcion:'Otro 2',
-      nombres:[
+        'Otro',
+        'Otro 1',
         'Otro 2'
       ]
     },
@@ -14787,11 +14783,18 @@ async function guardarTotalesTurno(){
       ]
     },
 
-    {
+     {
       descripcion:'Tigo recargas',
       nombres:[
         'Tigo recargas',
         'Recargas Tigo'
+      ]
+    },
+
+    {
+      descripcion:'Efectivo Transf rec / Dep',
+      nombres:[
+        'Efectivo Transf rec / Dep'
       ]
     }
 
@@ -19003,6 +19006,117 @@ async function guardarCreditoFilaSiAplica(
   return tr;
 
 }
+
+
+/* ================================================
+   NAVEGACION POR FLECHAS EN REGISTRO OPERACIONES
+================================================ */
+
+document.addEventListener('keydown', function(event) {
+
+  const teclas = [
+    'ArrowUp',
+    'ArrowDown',
+    'ArrowLeft',
+    'ArrowRight'
+  ];
+
+  if (!teclas.includes(event.key)) return;
+
+  const actual = event.target;
+
+  if (!actual.matches(
+    '.operacion-celda-input, .operacion-celda-select'
+  )) return;
+
+  const fila = actual.closest('.fila-operacion');
+
+  if (!fila || !fila.closest('#operacionesFilas')) {
+    return;
+  }
+
+  // Evitar interferir con la selección de texto.
+  if (event.shiftKey || event.ctrlKey ||
+      event.altKey || event.metaKey) {
+    return;
+  }
+
+  const obtenerCeldas = fila =>
+    [...fila.querySelectorAll(
+      '.operacion-celda-input:not([readonly]):not([disabled]),' +
+      '.operacion-celda-select:not([disabled])'
+    )].filter(el =>
+      el.getClientRects().length > 0
+    );
+
+  const filas = [...document.querySelectorAll(
+    '#operacionesFilas .fila-operacion'
+  )];
+
+  const indiceFila = filas.indexOf(fila);
+  const celdasActuales = obtenerCeldas(fila);
+
+  const celda = actual.closest('td');
+  const indiceColumna = [...fila.cells].indexOf(celda);
+
+  let destino = null;
+
+  if (
+    event.key === 'ArrowLeft' ||
+    event.key === 'ArrowRight'
+  ) {
+    const direccion =
+      event.key === 'ArrowRight' ? 1 : -1;
+
+    const indice = celdasActuales.indexOf(actual);
+
+    destino = celdasActuales[indice + direccion];
+
+    if (!destino) {
+      const filaSiguiente =
+        filas[indiceFila + direccion];
+
+      if (filaSiguiente) {
+        const disponibles =
+          obtenerCeldas(filaSiguiente);
+
+        destino = direccion === 1
+          ? disponibles[0]
+          : disponibles[disponibles.length - 1];
+      }
+    }
+  } else {
+    const direccion =
+      event.key === 'ArrowDown' ? 1 : -1;
+
+    const filaDestino =
+      filas[indiceFila + direccion];
+
+    if (filaDestino) {
+      const columnaDestino =
+        filaDestino.cells[indiceColumna];
+
+      destino = columnaDestino?.querySelector(
+        '.operacion-celda-input:not([readonly]):not([disabled]),' +
+        '.operacion-celda-select:not([disabled])'
+      );
+    }
+  }
+
+  if (!destino) return;
+
+  event.preventDefault();
+  destino.focus();
+
+  if (
+    destino.tagName === 'INPUT' &&
+    typeof destino.select === 'function'
+  ) {
+    destino.select();
+  }
+
+});
+
 /* ======================================================
    LEER FILAS ACTUALES
 ====================================================== */
@@ -25316,25 +25430,12 @@ function construirReporteImpresionChombo(datos) {
     </tr>
   `).join('');
 
-  // Valor parcial de Efectivo
-  const efectivoParcial = detalles
-    .filter(item =>
-      String(item.movimiento || '').trim()
-        .toLowerCase() === 'efectivo'
-    )
-    .reduce(
-      (suma, item) => suma + numero(item.parcial),
-      0
-    );
-
-  // Totales del turno
-  const entradas = numero(datos.totalEntradas)
-    + efectivoParcial;
-
-  const salidas = numero(datos.totalSalidas);
-
-  const saldo = entradas - salidas;
-
+// Totales del turno: Efectivo ya está incluido
+// en Entradas desde el guardado en Google Sheets.
+const entradas = numero(datos.totalEntradas);
+const salidas = numero(datos.totalSalidas);
+const saldo = entradas - salidas;
+  
   // Arqueo de caja
   let tablaCaja = '';
   let totalEfectivo = 0;
@@ -25493,6 +25594,12 @@ function construirReporteImpresionChombo(datos) {
         }
 
         .chombo-imp-totales {
+  width:100%;
+  max-width:100%;
+  margin:0;
+  border-collapse:collapse;
+  table-layout:fixed;
+}
           width:48%;
           margin:7px 0 5px auto;
           border-collapse:collapse;
@@ -25586,31 +25693,38 @@ function construirReporteImpresionChombo(datos) {
         </tbody>
       </table>
 
-      <table class="chombo-imp-totales">
-
-        <thead>
-          <tr>
-            <th>Suma</th>
-            <th>Entradas</th>
-            <th>Salidas</th>
-          </tr>
-        </thead>
-
-        <tbody>
-          <tr>
-            <td>Suma</td>
-            <td>${dinero(entradas)}</td>
-            <td>${dinero(salidas)}</td>
-          </tr>
-
-          <tr class="chombo-imp-saldo-fila">
-            <td>Saldo</td>
-            <td></td>
-            <td>${dinero(saldo)}</td>
-          </tr>
-        </tbody>
-
-      </table>
+      
+<table class="chombo-imp-tabla-detalles chombo-imp-totales">
+  <colgroup>
+    <col style="width:16.6667%">
+    <col style="width:16.6667%">
+    <col style="width:16.6667%">
+    <col style="width:16.6667%">
+    <col style="width:16.6667%">
+    <col style="width:16.6667%">
+  </colgroup>
+  <tbody>
+    <tr>
+      <td colspan="4" style="text-align:right;font-weight:bold">
+        Suma
+      </td>
+      <td class="chombo-imp-num">
+        ${dinero(entradas)}
+      </td>
+      <td class="chombo-imp-num">
+        ${dinero(salidas)}
+      </td>
+    </tr>
+    <tr class="chombo-imp-saldo-fila">
+      <td colspan="5" style="text-align:right;font-weight:bold">
+        Saldo
+      </td>
+      <td class="chombo-imp-num">
+        ${dinero(saldo)}
+      </td>
+    </tr>
+  </tbody>
+</table>
 
       ${tablaCaja}
 
