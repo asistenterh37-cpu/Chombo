@@ -25394,18 +25394,25 @@ async function consultarImpresionChombo() {
 }
 
 
+/* ======================================================
+ MINI SUPER EL CHOMBO
+ IMPRESION TERMICA - CINTA DE 80 MM
+ SOLO MODIFICA EL FORMATO DE IMPRESION
+====================================================== */
+
 function construirReporteImpresionChombo(datos) {
 
   const esc = escaparImpresionChombo;
   const dinero = dineroImpresionChombo;
 
   const numero = valor => {
-    if (typeof valor === 'number') return valor;
-    const texto = String(valor ?? '').trim();
-    if (!texto) return 0;
-    const limpio = texto.replace(/,/g, '');
-    const resultado = Number(limpio);
-    return Number.isFinite(resultado) ? resultado : 0;
+    if (typeof valor === 'number') {
+      return Number.isFinite(valor) ? valor : 0;
+    }
+    const n = Number(
+      String(valor ?? '').replace(/,/g, '').trim()
+    );
+    return Number.isFinite(n) ? n : 0;
   };
 
   const fecha = String(datos.fecha || '');
@@ -25413,32 +25420,44 @@ function construirReporteImpresionChombo(datos) {
     ? fecha.split('-').reverse().join('/')
     : fecha;
 
-  const detalles = datos.detalles || [];
+  const detalles = Array.isArray(datos.detalles)
+    ? datos.detalles : [];
 
-  const filas = detalles.map(item => `
-    <tr>
-      <td>${esc(item.modulo)}</td>
-      <td>${esc(item.movimiento)}</td>
-      <td>${esc(item.descripcion)}</td>
-      <td class="chombo-imp-num">${dinero(item.parcial)}</td>
-      <td class="chombo-imp-num">${dinero(item.entrada)}</td>
-      <td class="chombo-imp-num">${dinero(item.salida)}</td>
-    </tr>
-  `).join('');
+  /* MOVIMIENTOS GUARDADOS EN CIERRES */
 
-// Totales del turno: Efectivo ya está incluido
-// en Entradas desde el guardado en Google Sheets.
-const entradas = numero(datos.totalEntradas);
-const salidas = numero(datos.totalSalidas);
-const saldo = entradas - salidas;
-  
-  // Arqueo de caja
+  const filas = detalles.map(item => {
+
+    const modulo = String(item.modulo || '').trim();
+    const movimiento = String(item.movimiento || '').trim();
+    const descripcion = String(item.descripcion || '').trim();
+
+    const concepto = [modulo, movimiento, descripcion]
+      .filter(Boolean).join(' / ');
+
+    return `
+      <tr>
+        <td class="ticket-texto">${esc(concepto)}</td>
+        <td class="ticket-num">${dinero(item.parcial)}</td>
+        <td class="ticket-num">${dinero(item.entrada)}</td>
+        <td class="ticket-num">${dinero(item.salida)}</td>
+      </tr>
+    `;
+  }).join('');
+
+  /* TOTALES EXISTENTES DEL CIERRE */
+
+  const entradas = numero(datos.totalEntradas);
+  const salidas = numero(datos.totalSalidas);
+  const saldo = entradas - salidas;
+
+  /* ARQUEO GUARDADO EN CAJA */
+
   let tablaCaja = '';
-  let totalEfectivo = 0;
 
   if (datos.arqueo) {
 
-    const cantidades = datos.arqueo.cantidades || [];
+    const cantidades = Array.isArray(datos.arqueo.cantidades)
+      ? datos.arqueo.cantidades : [];
 
     const denominaciones = [
       500, 200, 100, 50, 20, 10, 5, 2, 1
@@ -25446,11 +25465,11 @@ const saldo = entradas - salidas;
 
     const lista = denominaciones.map(denominacion => {
 
-      const item = cantidades.find(x =>
-        Number(x.denominacion) === denominacion
+      const registro = cantidades.find(item =>
+        numero(item.denominacion) === denominacion
       );
 
-      const cantidad = numero(item?.cantidad);
+      const cantidad = numero(registro?.cantidad);
 
       return {
         denominacion,
@@ -25460,224 +25479,242 @@ const saldo = entradas - salidas;
     });
 
     const totalCantidad = lista.reduce(
-      (suma, item) => suma + item.cantidad,
-      0
+      (suma, item) => suma + item.cantidad, 0
     );
 
-    totalEfectivo = lista.reduce(
-      (suma, item) => suma + item.valor,
-      0
+    const totalEfectivo = lista.reduce(
+      (suma, item) => suma + item.valor, 0
     );
 
-    const columnas = lista.map(item => `
-      <th>${item.denominacion}</th>
+    const filasArqueo = lista.map(item => `
+      <tr>
+        <td>${item.denominacion}</td>
+        <td>${item.cantidad}</td>
+        <td>${dinero(item.valor)}</td>
+      </tr>
     `).join('');
-
-    const cantidadesHTML = lista.map(item => `
-      <td>${item.cantidad}</td>
-    `).join('');
-
-    const valoresHTML = lista.map(item => `
-      <td>${dinero(item.valor)}</td>
-    `).join('');
-
-    const saldoMenosEfectivo =
-      saldo - totalEfectivo;
 
     tablaCaja = `
-      <section class="chombo-imp-arqueo">
+      <section class="ticket-arqueo">
+        <h3>ARQUEO DE CAJA</h3>
 
-        <h3>Arqueo de caja</h3>
-
-        <table class="chombo-imp-tabla-arqueo">
-
+        <table class="ticket-tabla-caja">
           <thead>
             <tr>
               <th>Billetes</th>
-              ${columnas}
-              <th>Total</th>
+              <th>Cantidad</th>
+              <th>Valor</th>
             </tr>
           </thead>
-
           <tbody>
-
-            <tr>
-              <th>Cantidad</th>
-              ${cantidadesHTML}
-              <th>${totalCantidad}</th>
+            ${filasArqueo}
+            <tr class="ticket-negrita">
+              <td>Total</td>
+              <td>${totalCantidad}</td>
+              <td>${dinero(totalEfectivo)}</td>
             </tr>
-
-            <tr>
-              <th>Valor</th>
-              ${valoresHTML}
-              <th>${dinero(totalEfectivo)}</th>
-            </tr>
-
           </tbody>
-
         </table>
 
-        <div class="chombo-imp-saldo-efectivo">
-          <span>Saldo - Efectivo</span>
-          <strong>${dinero(saldoMenosEfectivo)}</strong>
+        <div class="ticket-diferencia">
+          <strong>Saldo - Efectivo</strong>
+          <strong>${dinero(saldo - totalEfectivo)}</strong>
         </div>
-
       </section>
     `;
 
   } else {
 
     tablaCaja = `
-      <section class="chombo-imp-arqueo">
-        <h3>Arqueo de caja</h3>
+      <section class="ticket-arqueo">
+        <h3>ARQUEO DE CAJA</h3>
         <p>No existe arqueo guardado para este TurnoID.</p>
       </section>
     `;
   }
 
+  /* COMPROBANTE VERTICAL */
+
   return `
-    <div class="chombo-imp-hoja">
+    <div class="chombo-imp-hoja ticket-chombo">
 
       <style>
-        .chombo-imp-hoja {
-          width:100%;
-          max-width:100%;
-          color:#111827;
-          background:white;
-          font-family:Arial,sans-serif;
-          font-size:11px;
+        .chombo-imp-hoja.ticket-chombo {
+          width:72mm !important;
+          min-width:0 !important;
+          max-width:72mm !important;
+          margin:0 auto !important;
+          padding:2mm 0 !important;
+          font-family:Arial,sans-serif !important;
+          font-size:9px !important;
+          line-height:1.2 !important;
+          color:#000 !important;
+          background:white !important;
+          box-sizing:border-box !important;
         }
 
-        .chombo-imp-hoja h2 {
-          text-align:center;
-          font-size:16px;
-          margin:0 0 8px;
+        .ticket-chombo * {
+          box-sizing:border-box !important;
         }
 
-        .chombo-imp-encabezado {
-          margin-bottom:9px;
+        .ticket-chombo h2 {
+          font-size:13px !important;
+          text-align:center !important;
+          font-weight:bold !important;
+          margin:0 0 5px !important;
+          color:#000 !important;
         }
 
-        .chombo-imp-encabezado p {
-          margin:3px 0;
-          font-size:11px;
+        .ticket-chombo h3 {
+          font-size:10px !important;
+          text-align:center !important;
+          margin:7px 0 4px !important;
+          color:#000 !important;
         }
 
-        .chombo-imp-hoja table {
-          width:100%;
-          max-width:100%;
-          border-collapse:collapse;
-          table-layout:fixed;
-          margin:5px 0;
+        .ticket-encabezado {
+          font-size:9px !important;
+          margin:5px 0 7px !important;
         }
 
-        .chombo-imp-hoja th,
-        .chombo-imp-hoja td {
-          border:1px solid #9ca3af;
-          padding:4px;
-          font-size:10px;
+        .ticket-encabezado p {
+          margin:2px 0 !important;
+          font-size:9px !important;
           overflow-wrap:anywhere;
         }
 
-        .chombo-imp-hoja th {
-          background:#e5e7eb;
-          font-weight:bold;
+        .ticket-chombo table {
+          width:100% !important;
+          max-width:100% !important;
+          min-width:0 !important;
+          border-collapse:collapse !important;
+          table-layout:fixed !important;
+          margin:3px 0 !important;
         }
 
-        .chombo-imp-num {
-          text-align:right;
-          white-space:nowrap;
+        .ticket-chombo th,
+        .ticket-chombo td {
+          border:1px solid #444 !important;
+          padding:2px 2px !important;
+          font-size:8px !important;
+          line-height:1.15 !important;
+          color:#000 !important;
+          background:white !important;
+          vertical-align:middle !important;
+          overflow-wrap:anywhere !important;
         }
 
-        .chombo-imp-totales {
-  width:100%;
-  max-width:100%;
-  margin:0;
-  border-collapse:collapse;
-  table-layout:fixed;
-}
-          width:48%;
-          margin:7px 0 5px auto;
-          border-collapse:collapse;
-        }
-
-        .chombo-imp-totales th,
-        .chombo-imp-totales td {
-          text-align:center;
-          padding:5px 7px;
-          font-size:11px;
-        }
-
-        .chombo-imp-totales
-        .chombo-imp-saldo-fila td {
-          font-weight:bold;
-          background:#eef4ff;
-        }
-
-        .chombo-imp-arqueo {
-          margin-top:5px;
-          break-inside:avoid;
-          page-break-inside:avoid;
-        }
-
-        .chombo-imp-arqueo h3 {
-          text-align:center;
-          font-size:13px;
-          margin:5px 0 4px;
-        }
-
-        .chombo-imp-hoja
-        .chombo-imp-tabla-arqueo {
-          width:100%;
-          table-layout:fixed;
-          margin:3px 0;
-        }
-
-        .chombo-imp-hoja
-        .chombo-imp-tabla-arqueo th,
-        .chombo-imp-hoja
-        .chombo-imp-tabla-arqueo td {
+        .ticket-chombo th {
+          font-weight:bold !important;
           text-align:center !important;
-          vertical-align:middle;
-          padding:4px 2px;
-          font-size:9px;
-          white-space:nowrap;
         }
 
-        .chombo-imp-saldo-efectivo {
-          display:flex;
-          justify-content:flex-end;
-          gap:28px;
-          align-items:center;
-          margin:5px 0 0;
-          padding:5px 9px;
-          font-size:11px;
-          font-weight:bold;
-          background:#eef4ff;
-          border:1px solid #cbd5e1;
+        .ticket-tabla-movimientos col:nth-child(1) {
+          width:43%;
         }
 
-        .chombo-imp-saldo-efectivo strong {
-          min-width:100px;
-          text-align:right;
+        .ticket-tabla-movimientos col:nth-child(2) {
+          width:19%;
+        }
+
+        .ticket-tabla-movimientos col:nth-child(3) {
+          width:19%;
+        }
+
+        .ticket-tabla-movimientos col:nth-child(4) {
+          width:19%;
+        }
+
+        .ticket-chombo .ticket-texto {
+          text-align:left !important;
+        }
+
+        .ticket-chombo .ticket-num {
+          text-align:right !important;
+          font-size:7.3px !important;
+          white-space:nowrap !important;
+          overflow-wrap:normal !important;
+        }
+
+        .ticket-chombo .ticket-negrita td,
+        .ticket-chombo .ticket-saldo td {
+          font-weight:bold !important;
+        }
+
+        .ticket-chombo .ticket-tabla-caja th,
+        .ticket-chombo .ticket-tabla-caja td {
+          text-align:center !important;
+          font-size:9px !important;
+          padding:3px 2px !important;
+        }
+
+        .ticket-tabla-caja th:nth-child(1),
+        .ticket-tabla-caja td:nth-child(1) {
+          width:28%;
+        }
+
+        .ticket-tabla-caja th:nth-child(2),
+        .ticket-tabla-caja td:nth-child(2) {
+          width:28%;
+        }
+
+        .ticket-tabla-caja th:nth-child(3),
+        .ticket-tabla-caja td:nth-child(3) {
+          width:44%;
+        }
+
+        .ticket-chombo .ticket-arqueo {
+          margin-top:6px !important;
+        }
+
+        .ticket-chombo .ticket-diferencia {
+          display:flex !important;
+          justify-content:space-between !important;
+          align-items:center !important;
+          gap:6px !important;
+          margin-top:5px !important;
+          border:1px solid #444 !important;
+          padding:4px !important;
+          font-size:9px !important;
+        }
+
+        .ticket-diferencia strong:last-child {
+          text-align:right !important;
+          white-space:nowrap !important;
+        }
+
+        @media print {
+          .chombo-imp-hoja.ticket-chombo {
+            margin:0 auto !important;
+            padding:0 !important;
+          }
+
+          .ticket-chombo tr {
+            break-inside:avoid !important;
+            page-break-inside:avoid !important;
+          }
         }
       </style>
 
-      <h2>CHOMBO - CIERRE DE TURNO</h2>
+      <h2>Mini Super El Chombo</h2>
 
-      <div class="chombo-imp-encabezado">
+      <div class="ticket-encabezado">
+        <p><strong>Cierre de turno</strong></p>
+        <p><strong>Turno ID:</strong> ${esc(datos.turnoId)}</p>
         <p><strong>Fecha:</strong> ${esc(fechaTexto)}</p>
         <p><strong>Ubicación:</strong> ${esc(datos.ubicacion)}</p>
         <p><strong>Responsable:</strong> ${esc(datos.responsable)}</p>
-        <p><strong>TurnoID:</strong> ${esc(datos.turnoId)}</p>
       </div>
 
-      <table class="chombo-imp-tabla-detalles">
+      <table class="ticket-tabla-movimientos">
+
+        <colgroup>
+          <col><col><col><col>
+        </colgroup>
+
         <thead>
           <tr>
-            <th>Módulo</th>
             <th>Movimiento</th>
-            <th>Descripción</th>
             <th>Parcial</th>
             <th>Entradas</th>
             <th>Salidas</th>
@@ -25686,41 +25723,23 @@ const saldo = entradas - salidas;
 
         <tbody>
           ${filas}
+
+          <tr class="ticket-negrita">
+            <td colspan="2" style="text-align:center">
+              Suma
+            </td>
+            <td class="ticket-num">${dinero(entradas)}</td>
+            <td class="ticket-num">${dinero(salidas)}</td>
+          </tr>
+
+          <tr class="ticket-saldo">
+            <td colspan="3" style="text-align:right">
+              Saldo
+            </td>
+            <td class="ticket-num">${dinero(saldo)}</td>
+          </tr>
         </tbody>
       </table>
-
-      
-<table class="chombo-imp-tabla-detalles chombo-imp-totales">
-  <colgroup>
-    <col style="width:16.6667%">
-    <col style="width:16.6667%">
-    <col style="width:16.6667%">
-    <col style="width:16.6667%">
-    <col style="width:16.6667%">
-    <col style="width:16.6667%">
-  </colgroup>
-  <tbody>
-    <tr>
-      <td colspan="4" style="text-align:right;font-weight:bold">
-        Suma
-      </td>
-      <td class="chombo-imp-num">
-        ${dinero(entradas)}
-      </td>
-      <td class="chombo-imp-num">
-        ${dinero(salidas)}
-      </td>
-    </tr>
-    <tr class="chombo-imp-saldo-fila">
-      <td colspan="5" style="text-align:right;font-weight:bold">
-        Saldo
-      </td>
-      <td class="chombo-imp-num">
-        ${dinero(saldo)}
-      </td>
-    </tr>
-  </tbody>
-</table>
 
       ${tablaCaja}
 
@@ -25729,6 +25748,10 @@ const saldo = entradas - salidas;
 }
 
 
+/* ======================================================
+ IMPRIMIR EN CINTA TERMICA
+====================================================== */
+
 function imprimirVistaCierreChombo() {
 
   if (!impresionCierreActual) {
@@ -25736,14 +25759,9 @@ function imprimirVistaCierreChombo() {
     return;
   }
 
-  const contenido = document.querySelector(
-    '#chomboImpVista .chombo-imp-hoja'
-  )?.outerHTML;
-
-  if (!contenido) {
-    alert('No existe una vista previa para imprimir.');
-    return;
-  }
+  const contenido = construirReporteImpresionChombo(
+    impresionCierreActual
+  );
 
   const ventana = window.open('', '_blank');
 
@@ -25760,12 +25778,11 @@ function imprimirVistaCierreChombo() {
 
     <head>
       <meta charset="UTF-8">
-      <title>Chombo - Cierre de turno</title>
+      <title>Mini Super El Chombo - Cierre</title>
 
       <style>
         @page {
-          size:letter portrait;
-          margin:7mm;
+          margin:2mm 4mm;
         }
 
         * {
@@ -25776,143 +25793,38 @@ function imprimirVistaCierreChombo() {
           margin:0;
           padding:0;
           width:100%;
+          height:auto;
           background:white;
-        }
-
-        body {
+          color:black;
           font-family:Arial,sans-serif;
-          color:#111827;
-          font-size:9px;
         }
 
-        .chombo-imp-hoja {
-          width:100%;
-          max-width:100%;
-          margin:0;
-          padding:0;
-        }
-
-        .chombo-imp-hoja h2 {
-          font-size:13px;
-          margin:0 0 5px;
-        }
-
-        .chombo-imp-encabezado {
-          margin-bottom:5px;
-        }
-
-        .chombo-imp-encabezado p {
-          margin:2px 0;
-          font-size:9px;
-        }
-
-        .chombo-imp-hoja table {
-          width:100%;
-          border-collapse:collapse;
-          table-layout:fixed;
-          margin:4px 0;
-        }
-
-        .chombo-imp-hoja th,
-        .chombo-imp-hoja td {
-          border:1px solid #888;
-          padding:2px 3px;
-          font-size:8px;
-          line-height:1.1;
-          overflow-wrap:anywhere;
-        }
-
-        .chombo-imp-hoja th {
-          background:#e5e7eb;
-        }
-
-        .chombo-imp-num {
-          text-align:right;
-          white-space:nowrap;
-        }
-
-        .chombo-imp-totales {
-          width:48%;
-          margin:5px 0 3px auto;
-        }
-
-        .chombo-imp-totales th,
-        .chombo-imp-totales td {
-          text-align:center;
-          font-size:8px;
-          padding:3px;
-        }
-
-        .chombo-imp-arqueo {
-          margin-top:3px;
-          break-inside:avoid;
-          page-break-inside:avoid;
-        }
-
-        .chombo-imp-arqueo h3 {
-          font-size:11px;
-          margin:4px 0 3px;
-          text-align:center;
-        }
-
-        .chombo-imp-tabla-arqueo {
-          width:100%;
-          table-layout:fixed;
-          margin:2px 0;
-        }
-
-        .chombo-imp-tabla-arqueo th,
-        .chombo-imp-tabla-arqueo td {
-          text-align:center !important;
-          font-size:8px;
-          padding:3px 1px;
-          white-space:nowrap;
-        }
-
-        .chombo-imp-saldo-efectivo {
-          display:flex;
-          justify-content:flex-end;
-          align-items:center;
-          gap:20px;
-          margin-top:4px;
-          padding:4px 7px;
-          font-size:9px;
-          font-weight:bold;
-          border:1px solid #aaa;
-          background:#eef4ff;
-        }
-
-        tr {
-          break-inside:avoid;
-          page-break-inside:avoid;
-        }
-
-        thead {
-          display:table-header-group;
+        .chombo-imp-hoja.ticket-chombo {
+          width:72mm !important;
+          max-width:72mm !important;
+          margin:0 auto !important;
+          padding:0 !important;
         }
 
         @media print {
+
           html, body {
-            width:100%;
-            height:auto;
+            margin:0 !important;
+            padding:0 !important;
+            height:auto !important;
+            overflow:visible !important;
           }
 
-          .chombo-imp-hoja {
-            width:100%;
+          tr {
+            break-inside:avoid !important;
+            page-break-inside:avoid !important;
           }
 
-          .chombo-imp-arqueo {
-            break-inside:avoid;
-            page-break-inside:avoid;
-          }
-
-          th {
-            -webkit-print-color-adjust:exact;
-            print-color-adjust:exact;
+          thead {
+            display:table-header-group;
           }
         }
       </style>
-
     </head>
 
     <body>
@@ -25923,11 +25835,16 @@ function imprimirVistaCierreChombo() {
   `);
 
   ventana.document.close();
-  ventana.focus();
-  ventana.print();
+
+  ventana.addEventListener('load', () => {
+    ventana.focus();
+    ventana.print();
+  });
+
 }
 
-/* ======================================================
+
+  /* ======================================================
    INICIAR APLICACIÓN
 ====================================================== */
 
