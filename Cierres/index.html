@@ -25153,124 +25153,204 @@ function abrirImpresionCierreChombo() {
   `;
 
   const estilos = document.createElement('style');
+  
   estilos.textContent = `
     #modalImpresionChombo {
       position:fixed;
       inset:0;
       z-index:999999;
       background:rgba(0,0,0,.55);
-      padding:20px;
-      overflow:auto;
+      padding:12px;
+      overflow-y:auto;
+      overflow-x:hidden;
+      display:flex;
+      justify-content:center;
+      align-items:flex-start;
     }
+
     #modalImpresionChombo * {
       box-sizing:border-box;
     }
+
     .chombo-imp-panel {
-      max-width:1150px;
-      margin:20px auto;
-      background:white;
-      border-radius:12px;
-      padding:22px;
+      width:320px;
+      max-width:calc(100vw - 24px);
+      flex:0 0 auto;
+      margin:12px auto;
+      padding:12px 8px;
+      background:#fff;
+      border-radius:8px;
       color:#172033;
+      box-shadow:0 8px 24px rgba(0,0,0,.18);
     }
+
     .chombo-imp-cabecera {
       display:flex;
-      justify-content:space-between;
+      flex-direction:column;
       align-items:center;
-      gap:12px;
+      gap:8px;
+      text-align:center;
     }
+
+    .chombo-imp-cabecera h2 {
+      margin:0;
+      font-size:15px;
+      font-weight:800;
+    }
+
     .chombo-imp-cabecera button {
+      align-self:flex-end;
       background:#475467;
-      color:white;
+      color:#fff;
       border:0;
-      padding:10px;
-      border-radius:7px;
+      padding:6px 10px;
+      border-radius:5px;
+      font-size:11px;
       cursor:pointer;
     }
+
     .chombo-imp-filtros {
       display:flex;
-      gap:16px;
-      margin:20px 0;
-      flex-wrap:wrap;
+      flex-direction:column;
+      gap:8px;
+      margin:10px 0;
     }
+
     .chombo-imp-filtros label {
-      flex:1;
-      min-width:220px;
+      display:block;
+      width:100%;
+      min-width:0;
+      font-size:11px;
       font-weight:bold;
     }
+
     .chombo-imp-filtros input,
     .chombo-imp-filtros select {
       display:block;
       width:100%;
-      padding:11px;
-      margin-top:7px;
+      min-width:0;
+      padding:7px 5px;
+      margin-top:4px;
       border:1px solid #cbd5e1;
-      border-radius:8px;
-      background:white;
+      border-radius:5px;
+      background:#fff;
+      font-size:11px;
     }
-    .chombo-imp-hoja {
-      width:100%;
-      background:white;
-      color:#111827;
-    }
-    .chombo-imp-hoja h2,
-    .chombo-imp-hoja h3 {
+
+    #chomboImpMensaje {
+      font-size:11px;
       text-align:center;
-      margin:16px 0;
+      overflow-wrap:anywhere;
     }
-    .chombo-imp-hoja table {
+
+    #chomboImpVista {
       width:100%;
-      border-collapse:collapse;
-      margin:12px 0;
-      font-size:12px;
+      max-width:100%;
+      margin:0;
+      padding:0;
+      overflow:visible;
     }
-    .chombo-imp-hoja th,
-    .chombo-imp-hoja td {
-      border:1px solid #9ca3af;
-      padding:7px;
+
+    #chomboImpVista .chombo-imp-hoja.ticket-chombo {
+      width:100% !important;
+      min-width:0 !important;
+      max-width:100% !important;
+      margin:0 !important;
+      padding:2px 0 !important;
     }
-    .chombo-imp-hoja th {
-      background:#e5e7eb;
+
+    #chomboImpVista .ticket-chombo table {
+      width:100% !important;
+      max-width:100% !important;
+      min-width:0 !important;
+      table-layout:fixed !important;
+      border-collapse:collapse !important;
+      margin:3px 0 !important;
     }
+
+    #chomboImpVista .ticket-chombo th,
+    #chomboImpVista .ticket-chombo td {
+      padding:2px 1px !important;
+      font-size:8px !important;
+      line-height:1.15 !important;
+      overflow-wrap:anywhere !important;
+    }
+
+    #chomboImpVista .ticket-chombo .ticket-num {
+      font-size:7.3px !important;
+      text-align:right !important;
+      white-space:nowrap !important;
+    }
+
+    #chomboImpVista .ticket-chombo h2 {
+      margin:4px 0 !important;
+      text-align:center !important;
+      font-size:13px !important;
+    }
+
+    #chomboImpVista .ticket-chombo h3 {
+      margin:6px 0 3px !important;
+      text-align:center !important;
+      font-size:10px !important;
+    }
+
     .chombo-imp-num {
       text-align:right;
       white-space:nowrap;
     }
+
     .chombo-imp-totales {
-      margin:18px 0;
-      margin-left:auto;
-      max-width:360px;
+      margin:6px 0;
+      width:100%;
     }
+
     .chombo-imp-totales div {
       display:flex;
       justify-content:space-between;
+      padding:3px;
       border-bottom:1px solid #ddd;
-      padding:8px;
     }
-    .chombo-imp-totales div:last-child {
-      font-weight:bold;
-      background:#eef4ff;
-    }
+
     .chombo-imp-acciones {
       display:flex;
-      justify-content:flex-end;
-      margin-top:20px;
+      justify-content:center;
+      margin-top:10px;
+      padding-top:6px;
+      border-top:1px solid #ddd;
     }
+
     .chombo-imp-acciones button {
+      width:100%;
       background:#1769e0;
       color:white;
       border:0;
-      border-radius:8px;
-      padding:12px 28px;
+      border-radius:5px;
+      padding:9px;
+      font-size:12px;
       font-weight:bold;
       cursor:pointer;
     }
+
     .chombo-imp-acciones button:disabled {
       opacity:.4;
       cursor:not-allowed;
     }
+
     .chombo-imp-arqueo {
       break-inside:avoid;
+    }
+
+    @media(max-width:360px) {
+      #modalImpresionChombo {
+        padding:4px;
+      }
+
+      .chombo-imp-panel {
+        width:100%;
+        max-width:100%;
+        margin:4px auto;
+        padding:8px 5px;
+      }
     }
   `;
 
