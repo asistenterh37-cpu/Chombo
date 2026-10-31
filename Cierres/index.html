@@ -25832,6 +25832,13 @@ function construirReporteImpresionChombo(datos) {
  IMPRIMIR EN CINTA TERMICA
 ====================================================== */
 
+
+/* ======================================================
+   MINI SUPER EL CHOMBO
+   IMPRESION PARA CINTA TERMICA DE 80 MM
+   NO MODIFICA LOS DATOS DEL CIERRE
+====================================================== */
+
 function imprimirVistaCierreChombo() {
 
   if (!impresionCierreActual) {
@@ -25846,79 +25853,195 @@ function imprimirVistaCierreChombo() {
   const ventana = window.open('', '_blank');
 
   if (!ventana) {
-    alert('Permite las ventanas emergentes para imprimir.');
+    alert(
+      'Permite las ventanas emergentes para imprimir.'
+    );
     return;
   }
 
   ventana.document.open();
 
   ventana.document.write(`
-    <!DOCTYPE html>
-    <html lang="es">
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
 
-    <head>
-      <meta charset="UTF-8">
-      <title>Mini Super El Chombo - Cierre</title>
+<title>Mini Super El Chombo - Cierre</title>
 
-      <style>
-        @page {
-          margin:2mm 4mm;
-        }
+<style>
 
-        * {
-          box-sizing:border-box;
-        }
+/* PAPEL TERMICO DE 80 MM */
 
-        html, body {
-          margin:0;
-          padding:0;
-          width:100%;
-          height:auto;
-          background:white;
-          color:black;
-          font-family:Arial,sans-serif;
-        }
+@page {
+  size:80mm 297mm;
+  margin:0;
+}
 
-        .chombo-imp-hoja.ticket-chombo {
-          width:72mm !important;
-          max-width:72mm !important;
-          margin:0 auto !important;
-          padding:0 !important;
-        }
+* {
+  box-sizing:border-box;
+}
 
-        @media print {
+html {
+  margin:0 !important;
+  padding:0 !important;
+  background:#fff !important;
+}
 
-          html, body {
-            margin:0 !important;
-            padding:0 !important;
-            height:auto !important;
-            overflow:visible !important;
-          }
+body {
+  margin:0 !important;
+  padding:0 !important;
+  width:80mm !important;
+  max-width:80mm !important;
+  background:#fff !important;
+  color:#000 !important;
+  font-family:Arial,Helvetica,sans-serif !important;
+}
 
-          tr {
-            break-inside:avoid !important;
-            page-break-inside:avoid !important;
-          }
+/* EVITAR AJUSTES DE PAGINA CARTA */
 
-          thead {
-            display:table-header-group;
-          }
-        }
-      </style>
-    </head>
+@media print {
 
-    <body>
-      ${contenido}
-    </body>
+  html,
+  body {
+    width:80mm !important;
+    max-width:80mm !important;
+    margin:0 !important;
+    padding:0 !important;
+    zoom:1 !important;
+    transform:none !important;
+    overflow:visible !important;
+    -webkit-print-color-adjust:exact !important;
+    print-color-adjust:exact !important;
+  }
 
-    </html>
+  table {
+    border-collapse:collapse !important;
+    table-layout:fixed !important;
+  }
+
+  tr {
+    page-break-inside:avoid !important;
+    break-inside:avoid !important;
+  }
+
+  thead {
+    display:table-header-group !important;
+  }
+}
+
+</style>
+
+</head>
+
+<body>
+
+${contenido}
+
+<style>
+
+/* ANCHO REAL DEL COMPROBANTE */
+
+.chombo-imp-hoja.ticket-chombo {
+  width:68mm !important;
+  min-width:0 !important;
+  max-width:68mm !important;
+  margin:0 0 0 3mm !important;
+  padding:2mm 0 !important;
+  box-sizing:border-box !important;
+}
+
+/* AJUSTAR LAS COLUMNAS */
+
+.ticket-tabla-movimientos col:nth-child(1) {
+  width:48% !important;
+}
+
+.ticket-tabla-movimientos col:nth-child(2) {
+  width:17% !important;
+}
+
+.ticket-tabla-movimientos col:nth-child(3) {
+  width:17.5% !important;
+}
+
+.ticket-tabla-movimientos col:nth-child(4) {
+  width:17.5% !important;
+}
+
+/* LETRAS Y NUMEROS LEGIBLES */
+
+.ticket-chombo th,
+.ticket-chombo td {
+  color:#000 !important;
+  border:1px solid #000 !important;
+  font-weight:700 !important;
+  font-size:8.5px !important;
+  padding:2px 1px !important;
+  line-height:1.2 !important;
+}
+
+.ticket-chombo .ticket-num {
+  font-size:8px !important;
+  font-weight:700 !important;
+  text-align:right !important;
+  white-space:nowrap !important;
+}
+
+.ticket-chombo h2 {
+  font-size:14px !important;
+  font-weight:900 !important;
+  text-align:center !important;
+}
+
+.ticket-chombo h3 {
+  font-size:10px !important;
+  font-weight:900 !important;
+  text-align:center !important;
+}
+
+/* REFORZAR TOTALES Y SALDO */
+
+.ticket-chombo .ticket-negrita td,
+.ticket-chombo .ticket-saldo td {
+  font-weight:900 !important;
+  border:1px solid #000 !important;
+}
+
+/* IMPRESION SIN CONTENEDORES EXTRAS */
+
+@media print {
+
+  .chombo-imp-hoja.ticket-chombo {
+    width:68mm !important;
+    max-width:68mm !important;
+    margin:0 0 0 3mm !important;
+    padding:1mm 0 !important;
+    box-shadow:none !important;
+    border-radius:0 !important;
+    transform:none !important;
+  }
+
+  .ticket-chombo table {
+    width:100% !important;
+    max-width:100% !important;
+  }
+}
+
+</style>
+
+</body>
+</html>
   `);
 
   ventana.document.close();
 
-  ventana.addEventListener('load', () => {
+  ventana.addEventListener('load', function() {
     ventana.focus();
-    ventana.print();
+
+    setTimeout(function() {
+      ventana.print();
+    }, 350);
   });
 
 }
