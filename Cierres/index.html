@@ -19063,8 +19063,8 @@ async function guardarCreditoFilaSiAplica(
 
 
   /* ==================================================
-     RECUPERAR DATOS Y PREPARAR FILA
-     SIN INTERRUMPIR LAS FILAS VACÍAS
+     RECUPERAR FILAS, HABILITAR IMPORTES Y DECIMALES
+     NO MODIFICAR OTRAS FUNCIONES DEL FORMULARIO
   ================================================== */
 
   const selectModulo =
@@ -19083,40 +19083,146 @@ async function guardarCreditoFilaSiAplica(
     tr.querySelector('.operacion-salida');
 
   const moduloGuardado =
-    String(datos.modulo || '').trim();
+    String(datos.modulo ?? '').trim();
 
-  
-  /* ==================================================
-     CORRECCION INTEGRAL DE CAMPOS NUMERICOS
-     Y RECUPERACION DE OPERACIONES
-  ================================================== */
+  const movimientoGuardado =
+    String(datos.movimiento ?? '').trim();
 
-  // Los campos deben ser editables cuando
-  // el movimiento permite su utilización.
+  const camposNumericos =
+    [parcial, entrada, salida].filter(Boolean);
 
-  [parcial, entrada, salida].forEach(campo => {
-    if (!campo) return;
+  /* ----------------------------------------------
+     NORMALIZAR DECIMALES
+     Acepta 125.50 y 125,50
+     Conserva separadores de miles
+  ---------------------------------------------- */
+
+  function normalizarDecimalFila(valor) {
+
+    let texto = String(valor ?? '').trim();
+
+    if (/^\d+,\d{1,2}$/.test(texto)) {
+      texto = texto.replace(',', '.');
+    }
+
+    return texto;
+  }
+
+  /* ----------------------------------------------
+     PREPARAR CAMPOS
+     NO DEJARLOS EN SOLO LECTURA
+  ---------------------------------------------- */
+
+  camposNumericos.forEach(campo => {
 
     campo.readOnly = false;
+    campo.inputMode = 'decimal';
+    campo.autocomplete = 'off';
+
+    // Cada columna se habilitará de acuerdo
+    // con el movimiento seleccionado.
+
     campo.disabled = true;
-    campo.classList.add('operacion-bloqueada');
+
+    /* ------------------------------------------
+       MIENTRAS SE ESCRIBE
+    ------------------------------------------ */
+
+    campo.addEventListener('input', () => {
+
+      campo.value =
+        normalizarDecimalFila(campo.value);
+
+      marcarHoraFilaOperacion(campo);
+
+      recalcularTotalesOperaciones();
+
+    });
+
+    /* ------------------------------------------
+       AL SALIR DE LA CELDA
+       CALCULAR SUMAS Y FIJAR DOS DECIMALES
+    ------------------------------------------ */
+
+    campo.addEventListener('blur', () => {
+
+      if (campo.disabled || campo.readOnly) {
+        return;
+      }
+
+      const texto =
+        normalizarDecimalFila(campo.value);
+
+      if (!texto) {
+        campo.value = '';
+        recalcularTotalesOperaciones();
+        return;
+      }
+
+      try {
+
+        const resultado =
+          evaluarOperacionMonto(texto);
+
+        if (resultado === null) {
+          campo.value = '';
+          return;
+        }
+
+        campo.value =
+          Number(resultado).toFixed(2);
+
+        marcarHoraFilaOperacion(campo);
+
+        recalcularTotalesOperaciones();
+
+      } catch (error) {
+
+        // No borrar lo escrito cuando
+        // todavía exista un valor incorrecto.
+
+        campo.value = texto;
+
+        campo.setCustomValidity(
+          'Introduce un número o una suma válida.'
+        );
+
+        campo.reportValidity();
+
+        campo.setCustomValidity('');
+
+      }
+
+    });
+
   });
 
-  // Recuperar el módulo de la operación.
+  /* ----------------------------------------------
+     RESTAURAR MÓDULO GUARDADO
+  ---------------------------------------------- */
 
   if (selectModulo && moduloGuardado) {
+
     selectModulo.value = moduloGuardado;
 
     if (selectModulo.value !== moduloGuardado) {
+
       selectModulo.add(
-        new Option(moduloGuardado, moduloGuardado)
+        new Option(
+          moduloGuardado,
+          moduloGuardado
+        )
       );
+
       selectModulo.value = moduloGuardado;
+
     }
+
   }
 
-  // Recuperar los movimientos disponibles
-  // del módulo seleccionado.
+  /* ----------------------------------------------
+     RESTAURAR MOVIMIENTOS DEL CATÁLOGO
+  ---------------------------------------------- */
 
   if (selectMovimiento) {
 
@@ -19129,98 +19235,183 @@ async function guardarCreditoFilaSiAplica(
         movimientosPorModulo(moduloGuardado);
 
       movimientos.forEach(nombre => {
+
         selectMovimiento.add(
           new Option(nombre, nombre)
         );
+
       });
 
     }
 
     if (movimientoGuardado) {
 
-      selectMovimiento.value = movimientoGuardado;
+      selectMovimiento.value =
+        movimientoGuardado;
 
-      if (selectMovimiento.value !== movimientoGuardado) {
+      if (
+        selectMovimiento.value !==
+        movimientoGuardado
+      ) {
+
         selectMovimiento.add(
-          new Option(movimientoGuardado, movimientoGuardado)
+          new Option(
+            movimientoGuardado,
+            movimientoGuardado
+          )
         );
-        selectMovimiento.value = movimientoGuardado;
+
+        selectMovimiento.value =
+          movimientoGuardado;
+
       }
 
     }
 
   }
 
-  // Aplicar la configuración de Entrada y Salida
-  // únicamente cuando existe un movimiento.
+  /* ----------------------------------------------
+     HABILITAR CAMPOS SEGÚN EL CATÁLOGO
+     I = Entrada, J = Salida
+     Ambas vacías = Parcial
+  ---------------------------------------------- */
 
-  if (selectMovimiento && moduloGuardado &&
-      movimientoGuardado) {
+  function habilitarImportesFila() {
 
-    try {
+    camposNumericos.forEach(campo => {
+      campo.readOnly = false;
+    });
 
-      actualizarDescripcionFila(
-        selectMovimiento,
-        datos.descripcion || ''
-      );
+    if (
+      !selectModulo?.value ||
+      !selectMovimiento?.value
+    ) {
 
-      aplicarNaturalezaMovimiento(selectMovimiento);
+      camposNumericos.forEach(campo => {
 
-      // Desbloquear también la propiedad readOnly,
-      // que anteriormente impedía escribir valores.
+        campo.disabled = true;
 
-      [parcial, entrada, salida].forEach(campo => {
-        if (campo) campo.readOnly = false;
+        campo.classList.add(
+          'operacion-bloqueada'
+        );
+
       });
 
-      // Restaurar los importes almacenados.
-      // La configuración de naturaleza pudo
-      // limpiar temporalmente estos campos.
-
-      if (parcial && !parcial.disabled) {
-        parcial.value = datos.parcial ?? '';
-      }
-
-      if (entrada && !entrada.disabled) {
-        entrada.value = datos.entrada ?? '';
-      }
-
-      if (salida && !salida.disabled) {
-        salida.value = datos.salida ?? '';
-      }
-
-    } catch (error) {
-
-      console.error(
-        'Error configurando movimiento:',
-        error
-      );
-
+      return;
     }
 
-  }
+    aplicarNaturalezaMovimiento(
+      selectMovimiento
+    );
 
-  // Garantizar que el cambio posterior de
-  // módulo o movimiento mantenga campos editables.
+    camposNumericos.forEach(campo => {
 
-  [selectModulo, selectMovimiento].forEach(selector => {
+      campo.readOnly = false;
 
-    if (!selector) return;
+      if (campo.disabled) {
 
-    selector.addEventListener('change', () => {
+        campo.classList.add(
+          'operacion-bloqueada'
+        );
 
-      [parcial, entrada, salida].forEach(campo => {
-        if (campo) campo.readOnly = false;
-      });
+      } else {
+
+        campo.classList.remove(
+          'operacion-bloqueada'
+        );
+
+      }
 
     });
 
-  });
+  }
 
-  return tr;
+  /* ----------------------------------------------
+     CAMBIO DE MÓDULO O MOVIMIENTO
+     SE EJECUTA DESPUÉS DE LOS EVENTOS EXISTENTES
+  ---------------------------------------------- */
+
+  if (selectModulo) {
+
+    selectModulo.addEventListener(
+      'change',
+      () => {
+
+        habilitarImportesFila();
+
+        recalcularTotalesOperaciones();
+
+      }
+    );
 
   }
 
+  if (selectMovimiento) {
+
+    selectMovimiento.addEventListener(
+      'change',
+      () => {
+
+        habilitarImportesFila();
+
+        recalcularTotalesOperaciones();
+
+      }
+    );
+
+  }
+
+  /* ----------------------------------------------
+     RESTAURAR VALORES EXISTENTES
+     SIN PERDER SUS DECIMALES
+  ---------------------------------------------- */
+
+  if (moduloGuardado && movimientoGuardado) {
+
+    actualizarDescripcionFila(
+      selectMovimiento,
+      datos.descripcion || ''
+    );
+
+  }
+
+  habilitarImportesFila();
+
+  if (parcial && !parcial.disabled) {
+
+    parcial.value =
+      normalizarDecimalFila(
+        datos.parcial ?? ''
+      );
+
+  }
+
+  if (entrada && !entrada.disabled) {
+
+    entrada.value =
+      normalizarDecimalFila(
+        datos.entrada ?? ''
+      );
+
+  }
+
+  if (salida && !salida.disabled) {
+
+    salida.value =
+      normalizarDecimalFila(
+        datos.salida ?? ''
+      );
+
+  }
+
+  /* ----------------------------------------------
+     DEVOLVER LA FILA COMPLETA
+     ES INDISPENSABLE PARA MOSTRARLA EN PANTALLA
+  ---------------------------------------------- */
+
+  return tr;
+
+}
 
 /* ================================================
    NAVEGACION POR FLECHAS EN REGISTRO OPERACIONES
