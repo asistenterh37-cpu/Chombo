@@ -10681,16 +10681,59 @@ limpiarFormularioOperacionesTurno();
   turno.ubicacion || '';
 
 
- $('turnoBarResponsable').textContent =
-  turno.responsable || '';
 
+  /* ==========================================
+     IDENTIFICACIÓN DEL TURNO ACTIVO
+     Ubicación / Responsable / Caja / Inicio
+  ========================================== */
 
- $('turnoBarInicio').textContent =
-  turno.inicioTexto
-  ?
-  `ID: ${turno.turnoId} · Inicio: ${turno.inicioTexto}`
-  :
-  `ID: ${turno.turnoId}`;
+  $('turnoBarResponsable').textContent =
+    turno.responsable || '';
+
+  /* Obtener la caja del turno seleccionado */
+
+  const numeroCajaTurno =
+    String(turno.cajaNo ?? '').trim();
+
+  /* Mostrar Caja sin alterar el diseño */
+
+  let etiquetaCaja =
+    document.getElementById('turnoBarCajaNo');
+
+  if (!etiquetaCaja) {
+
+    etiquetaCaja =
+      document.createElement('span');
+
+    etiquetaCaja.id = 'turnoBarCajaNo';
+
+    etiquetaCaja.style.fontWeight = '800';
+    etiquetaCaja.style.whiteSpace = 'nowrap';
+
+    const referencia =
+      document.getElementById(
+        'turnoBarResponsable'
+      );
+
+    referencia.insertAdjacentElement(
+      'afterend',
+      etiquetaCaja
+    );
+
+  }
+
+  etiquetaCaja.textContent =
+    numeroCajaTurno
+      ? 'Caja No: ' + numeroCajaTurno
+      : 'Caja No: —';
+
+  /* Mantener TurnoID y fecha de inicio */
+
+  $('turnoBarInicio').textContent =
+    turno.inicioTexto
+      ? `ID: ${turno.turnoId} · Inicio: ${turno.inicioTexto}`
+      : `ID: ${turno.turnoId}`;
+
 
 
  /* ==========================================
