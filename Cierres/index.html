@@ -14252,48 +14252,42 @@ if (
         );
 
 
-      const finalEl =
-        $(
-          'saldoFinal_' +
-          clave
-        );
-
 
       const formatoSaldo = valor =>
-  Number(valor ?? 0).toLocaleString(
-    'en-US',
-    {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    }
-  );
+        Number(valor ?? 0).toLocaleString(
+          'en-US',
+          {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          }
+        );
 
-if (inicialEl) {
-  inicialEl.textContent =
-    formatoSaldo(dato.inicial);
-}
+      if (inicialEl) {
+        inicialEl.textContent =
+          formatoSaldo(dato.inicial);
+      }
 
-if (entradasEl) {
-  entradasEl.textContent =
-    formatoSaldo(dato.entradas);
-}
+      if (entradasEl) {
+        entradasEl.textContent =
+          formatoSaldo(dato.entradas);
+      }
 
-if (salidasEl) {
-  salidasEl.textContent =
-    formatoSaldo(dato.salidas);
-}
+      if (salidasEl) {
+        salidasEl.textContent =
+          formatoSaldo(dato.salidas);
+      }
 
-if (finalEl) {
-  finalEl.textContent =
-    formatoSaldo(dato.final);
-}
+      if (finalEl) {
+        finalEl.textContent =
+          formatoSaldo(dato.final);
       }
 
     }
   );
 
 }
-/* ======================================================
+
+      /* ======================================================
    GUARDAR SOLO TOTALES DEL TURNO
 
    GUARDA UNA SOLA FILA EN CIERRES:
