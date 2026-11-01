@@ -10892,67 +10892,197 @@ function seleccionarTurnoCierre(){
  USAR UN TURNO YA ABIERTO
 ====================================================== */
 
-function usarTurnoSeleccionado(){
 
- const select =
-  $('turnoActivoSelect');
+/* ======================================================
+ USAR TURNO SELECCIONADO
+ VALIDAR, ACTIVAR Y ABRIR OPERACIONES
+====================================================== */
 
+async function usarTurnoSeleccionado() {
 
- if(
-  !select ||
-  !select.value
- ){
+  const select = $('turnoActivoSelect');
+  const boton = $('usarTurnoBtn');
 
-  toast(
-   'Selecciona un turno activo.',
-   false
+  if (!select || !select.value) {
+    toast('Selecciona un turno activo.', false);
+    return;
+  }
+
+  const turnoId = String(select.value).trim();
+
+  const turnoLista = turnosActivosHoy.find(
+    item => String(item.turnoId).trim() === turnoId
   );
 
-  return;
+  if (!turnoLista) {
+    toast(
+      'El turno no aparece en la lista. Actualiza la página.',
+      false
+    );
+    return;
+  }
 
- }
+  if (boton) {
+    boton.disabled = true;
+    boton.textContent = 'Abriendo turno...';
+  }
 
+  try {
 
- const turno =
-  turnosActivosHoy.find(
-   item =>
-    item.turnoId ===
-    select.value
-  );
+    // Consultar el turno real en Google Sheets.
+    const data = await jsonpRequest(
+      'turno_obtener',
+      { turnoId: turnoId }
+    );
 
+    if (!data || data.ok !== true) {
+      throw new Error(
+        data?.message ||
+        'No se pudo consultar el turno.'
+      );
+    }
 
- if(!turno){
+    if (!data.turno) {
+      throw new Error(
+        'El turno seleccionado no existe en Google Sheets.'
+      );
+    }
 
-  toast(
-   'Ese turno ya no está activo. Actualiza la lista.',
-   false
-  );
+    const turno = {
+      ...turnoLista,
+      ...data.turno,
+      turnoId: turnoId
+    };
 
-  return;
+    if (
+      String(turno.estado || '')
+        .trim()
+        .toUpperCase() !== 'ACTIVO'
+    ) {
+      throw new Error(
+        'Este turno ya no está activo.'
+      );
+    }
 
- }
+    // Verificar que exista la pantalla de operaciones.
+    const vista = $('menuView');
 
+    if (!vista) {
+      throw new Error(
+        'No se encontró la pantalla de operaciones.'
+      );
+    }
 
- activarTurno(
-  turno
- );
+    // Mostrar primero la pantalla del turno.
+    showView('menuView');
 
+    // Activar la caja y cargar su información.
+    try {
 
- toast(
-  'Turno ' +
-  turno.turnoId +
-  ' seleccionado.',
-  true
- );
+      activarTurno(turno);
 
+    } catch (errorActivacion) {
 
- showView(
-  'menuView'
- );
+      console.error(
+        'Error al preparar operaciones:',
+        errorActivacion
+      );
+
+      // Mantener seleccionado el turno correcto.
+      turnoActivo = turno;
+      turnoCierreSeleccionado = turno;
+
+      localStorage.setItem(
+        TURNO_STORAGE_KEY,
+        turnoId
+      );
+
+      localStorage.setItem(
+        UBICACION_STORAGE_KEY,
+        turno.ubicacion || ''
+      );
+
+      // Recuperar los datos visibles del encabezado.
+      const barra = $('turnoBar');
+      if (barra) {
+        barra.classList.add('active');
+      }
+
+      const ubicacion = $('turnoBarUbicacion');
+      if (ubicacion) {
+        ubicacion.textContent = turno.ubicacion || '';
+      }
+
+      const responsable = $('turnoBarResponsable');
+      if (responsable) {
+        responsable.textContent = turno.responsable || '';
+      }
+
+      const inicio = $('turnoBarInicio');
+      if (inicio) {
+        inicio.textContent =
+          'ID: ' + turnoId +
+          (turno.inicioTexto
+            ? ' · Inicio: ' + turno.inicioTexto
+            : '');
+      }
+
+      // Recuperar las consultas sin interrumpir la vista.
+      try {
+        aplicarTurnoACierre();
+      } catch (e) {
+        console.error('Error al aplicar turno:', e);
+      }
+
+      Promise.resolve()
+        .then(() => cargarResumenTurno())
+        .catch(e => console.error('Error resumen:', e));
+
+      Promise.resolve()
+        .then(() => cargarUltimosArqueosCaja())
+        .catch(e => console.error('Error arqueos:', e));
+
+      Promise.resolve()
+        .then(() => cargarUltimosSaldos())
+        .catch(e => console.error('Error saldos:', e));
+
+      toast(
+        'Turno abierto, pero hubo un error al preparar el formulario. Revisa la consola antes de guardar.',
+        false
+      );
+
+      return;
+    }
+
+    toast(
+      'Turno ' + turnoId + ' seleccionado correctamente.',
+      true
+    );
+
+  } catch (error) {
+
+    console.error(
+      'ERROR AL SELECCIONAR TURNO:',
+      error
+    );
+
+    toast(
+      error.message || 'No se pudo abrir el turno.',
+      false
+    );
+
+  } finally {
+
+    if (boton) {
+      boton.disabled = false;
+      boton.textContent = 'Usar turno seleccionado';
+    }
+
+  }
 
 }
 
-
+  
 /* ======================================================
  ABRIR NUEVA CAJA
 ====================================================== */
