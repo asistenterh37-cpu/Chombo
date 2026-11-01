@@ -19085,94 +19085,114 @@ async function guardarCreditoFilaSiAplica(
   const moduloGuardado =
     String(datos.modulo || '').trim();
 
-  const movimientoGuardado =
-    String(datos.movimiento || '').trim();
+  
+  /* ==================================================
+     CORRECCION INTEGRAL DE CAMPOS NUMERICOS
+     Y RECUPERACION DE OPERACIONES
+  ================================================== */
 
-  // Una fila nueva no tiene movimientos todavía.
-  // Debe mostrarse sin ejecutar cálculos anticipados.
+  // Los campos deben ser editables cuando
+  // el movimiento permite su utilización.
+
+  [parcial, entrada, salida].forEach(campo => {
+    if (!campo) return;
+
+    campo.readOnly = false;
+    campo.disabled = true;
+    campo.classList.add('operacion-bloqueada');
+  });
+
+  // Recuperar el módulo de la operación.
 
   if (selectModulo && moduloGuardado) {
-
     selectModulo.value = moduloGuardado;
 
-    // Conservar módulos guardados aunque el
-    // catálogo haya cambiado posteriormente.
-
     if (selectModulo.value !== moduloGuardado) {
-
-      const opcion = new Option(
-        moduloGuardado,
-        moduloGuardado
+      selectModulo.add(
+        new Option(moduloGuardado, moduloGuardado)
       );
-
-      selectModulo.add(opcion);
       selectModulo.value = moduloGuardado;
+    }
+  }
+
+  // Recuperar los movimientos disponibles
+  // del módulo seleccionado.
+
+  if (selectMovimiento) {
+
+    selectMovimiento.innerHTML =
+      '<option value="">Seleccionar</option>';
+
+    if (moduloGuardado) {
+
+      const movimientos =
+        movimientosPorModulo(moduloGuardado);
+
+      movimientos.forEach(nombre => {
+        selectMovimiento.add(
+          new Option(nombre, nombre)
+        );
+      });
+
+    }
+
+    if (movimientoGuardado) {
+
+      selectMovimiento.value = movimientoGuardado;
+
+      if (selectMovimiento.value !== movimientoGuardado) {
+        selectMovimiento.add(
+          new Option(movimientoGuardado, movimientoGuardado)
+        );
+        selectMovimiento.value = movimientoGuardado;
+      }
 
     }
 
   }
 
-  // Preparar inicialmente las tres columnas
-  // numéricas para evitar introducir montos
-  // sin haber seleccionado un movimiento.
+  // Aplicar la configuración de Entrada y Salida
+  // únicamente cuando existe un movimiento.
 
-  [parcial, entrada, salida].forEach(campo => {
-
-    if (!campo) return;
-
-    campo.readOnly = true;
-
-  });
-
-  // Recuperar únicamente operaciones
-  // que ya tienen módulo y movimiento.
-
-  if (moduloGuardado && movimientoGuardado) {
+  if (selectMovimiento && moduloGuardado &&
+      movimientoGuardado) {
 
     try {
 
-      if (selectModulo) {
+      actualizarDescripcionFila(
+        selectMovimiento,
+        datos.descripcion || ''
+      );
 
-        actualizarMovimientoFila(
-          selectModulo,
-          movimientoGuardado
-        );
+      aplicarNaturalezaMovimiento(selectMovimiento);
 
+      // Desbloquear también la propiedad readOnly,
+      // que anteriormente impedía escribir valores.
+
+      [parcial, entrada, salida].forEach(campo => {
+        if (campo) campo.readOnly = false;
+      });
+
+      // Restaurar los importes almacenados.
+      // La configuración de naturaleza pudo
+      // limpiar temporalmente estos campos.
+
+      if (parcial && !parcial.disabled) {
+        parcial.value = datos.parcial ?? '';
       }
 
-      if (selectMovimiento) {
+      if (entrada && !entrada.disabled) {
+        entrada.value = datos.entrada ?? '';
+      }
 
-        if (
-          selectMovimiento.value !==
-          movimientoGuardado
-        ) {
-
-          const opcion = new Option(
-            movimientoGuardado,
-            movimientoGuardado
-          );
-
-          selectMovimiento.add(opcion);
-          selectMovimiento.value =
-            movimientoGuardado;
-
-        }
-
-        actualizarDescripcionFila(
-          selectMovimiento,
-          datos.descripcion || ''
-        );
-
-        aplicarNaturalezaMovimiento(
-          selectMovimiento
-        );
-
+      if (salida && !salida.disabled) {
+        salida.value = datos.salida ?? '';
       }
 
     } catch (error) {
 
       console.error(
-        'Error recuperando datos de operación:',
+        'Error configurando movimiento:',
         error
       );
 
@@ -19180,9 +19200,22 @@ async function guardarCreditoFilaSiAplica(
 
   }
 
-  // Si no existe movimiento, conservar
-  // los selectores y campos sin bloquear
-  // la creación del resto de las filas.
+  // Garantizar que el cambio posterior de
+  // módulo o movimiento mantenga campos editables.
+
+  [selectModulo, selectMovimiento].forEach(selector => {
+
+    if (!selector) return;
+
+    selector.addEventListener('change', () => {
+
+      [parcial, entrada, salida].forEach(campo => {
+        if (campo) campo.readOnly = false;
+      });
+
+    });
+
+  });
 
   return tr;
 
