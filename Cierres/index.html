@@ -19063,63 +19063,130 @@ async function guardarCreditoFilaSiAplica(
 
 
   /* ==================================================
-     RECUPERAR MODULO
+     RECUPERAR DATOS Y PREPARAR FILA
+     SIN INTERRUMPIR LAS FILAS VACÍAS
   ================================================== */
 
   const selectModulo =
-    tr.querySelector(
-      '.operacion-modulo'
-    );
-
-
-  if(
-    selectModulo &&
-    datos.modulo
-  ){
-
-    selectModulo.value =
-      datos.modulo;
-
-  }
-
-
-  /* ==================================================
-     RECUPERAR MOVIMIENTO
-  ================================================== */
-
-  if(selectModulo){
-
-    actualizarMovimientoFila(
-      selectModulo,
-      datos.movimiento || ''
-    );
-
-  }
-
-
-  /* ==================================================
-     RECUPERAR DESCRIPCION
-  ================================================== */
+    tr.querySelector('.operacion-modulo');
 
   const selectMovimiento =
-    tr.querySelector(
-      '.operacion-movimiento'
-    );
+    tr.querySelector('.operacion-movimiento');
 
+  const parcial =
+    tr.querySelector('.operacion-parcial');
 
-  if(selectMovimiento){
+  const entrada =
+    tr.querySelector('.operacion-entrada');
 
-    actualizarDescripcionFila(
-      selectMovimiento,
-      datos.descripcion || ''
-    );
+  const salida =
+    tr.querySelector('.operacion-salida');
+
+  const moduloGuardado =
+    String(datos.modulo || '').trim();
+
+  const movimientoGuardado =
+    String(datos.movimiento || '').trim();
+
+  // Una fila nueva no tiene movimientos todavía.
+  // Debe mostrarse sin ejecutar cálculos anticipados.
+
+  if (selectModulo && moduloGuardado) {
+
+    selectModulo.value = moduloGuardado;
+
+    // Conservar módulos guardados aunque el
+    // catálogo haya cambiado posteriormente.
+
+    if (selectModulo.value !== moduloGuardado) {
+
+      const opcion = new Option(
+        moduloGuardado,
+        moduloGuardado
+      );
+
+      selectModulo.add(opcion);
+      selectModulo.value = moduloGuardado;
+
+    }
 
   }
 
+  // Preparar inicialmente las tres columnas
+  // numéricas para evitar introducir montos
+  // sin haber seleccionado un movimiento.
+
+  [parcial, entrada, salida].forEach(campo => {
+
+    if (!campo) return;
+
+    campo.readOnly = true;
+
+  });
+
+  // Recuperar únicamente operaciones
+  // que ya tienen módulo y movimiento.
+
+  if (moduloGuardado && movimientoGuardado) {
+
+    try {
+
+      if (selectModulo) {
+
+        actualizarMovimientoFila(
+          selectModulo,
+          movimientoGuardado
+        );
+
+      }
+
+      if (selectMovimiento) {
+
+        if (
+          selectMovimiento.value !==
+          movimientoGuardado
+        ) {
+
+          const opcion = new Option(
+            movimientoGuardado,
+            movimientoGuardado
+          );
+
+          selectMovimiento.add(opcion);
+          selectMovimiento.value =
+            movimientoGuardado;
+
+        }
+
+        actualizarDescripcionFila(
+          selectMovimiento,
+          datos.descripcion || ''
+        );
+
+        aplicarNaturalezaMovimiento(
+          selectMovimiento
+        );
+
+      }
+
+    } catch (error) {
+
+      console.error(
+        'Error recuperando datos de operación:',
+        error
+      );
+
+    }
+
+  }
+
+  // Si no existe movimiento, conservar
+  // los selectores y campos sin bloquear
+  // la creación del resto de las filas.
 
   return tr;
 
-}
+  }
 
 
 /* ================================================
