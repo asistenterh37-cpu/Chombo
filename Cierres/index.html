@@ -3906,6 +3906,15 @@ const SCRIPT_URL =
 </button>
 
 <button
+  id="consultarDetalleBtn"
+  class="btn btn-primary"
+  type="button"
+  onclick="abrirConsultaDetalleChombo()"
+>
+  Consultar detalle
+</button>
+
+<button
   class="btn btn-print"
   type="button"
   onclick="abrirImpresionCierreChombo()"
@@ -15039,6 +15048,9 @@ const payload = {
 
   items:
     items,
+
+  detalle:
+    capturarDetalleChombo(),
 
   arqueoCaja:
     arqueoCaja,
@@ -26499,6 +26511,356 @@ ${contenido}
     }, 350);
   });
 
+}
+
+/* ======================================================
+   CHOMBO - DETALLE INDIVIDUAL DE OPERACIONES
+   No modifica el formulario ni la impresión.
+====================================================== */
+
+function capturarDetalleChombo() {
+
+  const filas = document.querySelectorAll(
+    '#operacionesFilas .fila-operacion'
+  );
+
+  return Array.from(filas).map(fila => {
+
+    const leer = clase =>
+      fila.querySelector(clase)?.value?.trim() || '';
+
+    const modulo = leer('.operacion-modulo');
+    const movimiento = leer('.operacion-movimiento');
+
+    if (
+      !modulo ||
+      !movimiento ||
+      modulo.toLowerCase() === 'seleccionar' ||
+      movimiento.toLowerCase() === 'seleccionar'
+    ) {
+      return null;
+    }
+
+    if (!fila.dataset.chomboDetalleId) {
+      fila.dataset.chomboDetalleId =
+        'OP-' + (
+          typeof crypto !== 'undefined' &&
+          typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : Date.now() + '-' +
+              Math.random().toString(36).slice(2)
+        );
+    }
+
+    const monto = clase => {
+      const texto = leer(clase);
+      if (!texto) return 0;
+
+      const valor = Number(texto.replace(/,/g, ''));
+
+      if (!Number.isFinite(valor)) {
+        throw new Error(
+          'Importe inválido en ' + modulo +
+          ' / ' + movimiento
+        );
+      }
+
+      return Math.round(
+        (valor + Number.EPSILON) * 100
+      ) / 100;
+    };
+
+    return {
+      idOperacion: fila.dataset.chomboDetalleId,
+      hora: leer('.operacion-hora'),
+      modulo: modulo,
+      movimiento: movimiento,
+      descripcion: leer('.operacion-descripcion'),
+      parcial: monto('.operacion-parcial'),
+      entrada: monto('.operacion-entrada'),
+      salida: monto('.operacion-salida')
+    };
+
+  }).filter(Boolean);
+}
+
+
+/* ======================================================
+   VENTANA DE CONSULTA
+====================================================== */
+
+function fechaLocalDetalleChombo() {
+  const d = new Date();
+  return [
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, '0'),
+    String(d.getDate()).padStart(2, '0')
+  ].join('-');
+}
+
+async function abrirConsultaDetalleChombo() {
+
+  document.getElementById(
+    'modalDetalleChombo'
+  )?.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'modalDetalleChombo';
+
+  modal.style.cssText = `
+    position:fixed;
+    inset:0;
+    z-index:99999;
+    background:rgba(0,0,0,.55);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:15px;
+  `;
+
+  modal.innerHTML = `
+    <div style="
+      background:white;
+      border-radius:12px;
+      width:min(1100px,100%);
+      max-height:92vh;
+      overflow:auto;
+      padding:20px;
+      color:#172033;
+      font-family:Arial,sans-serif;
+    ">
+      <h2 style="margin-top:0;text-align:center">
+        Mini Super El Chombo
+      </h2>
+      <h3>Consulta de operaciones detalladas</h3>
+
+      <div style="
+        display:flex;
+        gap:10px;
+        flex-wrap:wrap;
+        align-items:end;
+        margin-bottom:15px;
+      ">
+        <label>
+          Fecha
+          <input type="date" id="detalleFechaChombo"
+            style="display:block;padding:9px">
+        </label>
+
+        <label style="flex:1;min-width:220px">
+          TurnoID
+          <select id="detalleTurnoChombo"
+            style="display:block;width:100%;padding:9px">
+            <option value="">Seleccionar turno</option>
+          </select>
+        </label>
+
+        <button type="button" id="detalleBuscarChombo"
+          class="btn btn-primary">
+          Consultar
+        </button>
+
+        <button type="button" id="detalleCerrarChombo"
+          class="btn btn-print">
+          Cerrar
+        </button>
+      </div>
+
+      <div id="detalleResultadoChombo"
+        style="overflow-x:auto">
+        Selecciona una fecha y un turno.
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const fecha = modal.querySelector(
+    '#detalleFechaChombo'
+  );
+  const turno = modal.querySelector(
+    '#detalleTurnoChombo'
+  );
+  const resultado = modal.querySelector(
+    '#detalleResultadoChombo'
+  );
+
+  fecha.value = fechaLocalDetalleChombo();
+
+  modal.querySelector(
+    '#detalleCerrarChombo'
+  ).onclick = () => modal.remove();
+
+  const cargarTurnos = async () => {
+    resultado.textContent = 'Cargando turnos...';
+    turno.innerHTML =
+      '<option value="">Seleccionar turno</option>';
+
+    try {
+      const data = await jsonpRequest(
+        'turnos_impresion',
+        {fecha: fecha.value}
+      );
+
+      if (!data?.ok) {
+        throw new Error(
+          data?.message || 'No se cargaron los turnos.'
+        );
+      }
+
+      (data.turnos || []).forEach(t => {
+        const opcion = new Option(
+          [
+            t.turnoId,
+            t.ubicacion,
+            t.responsable
+          ].filter(Boolean).join(' - '),
+          t.turnoId
+        );
+
+        turno.add(opcion);
+      });
+
+      if (turnoActivo?.turnoId) {
+        const existe = Array.from(turno.options)
+          .some(o => o.value === turnoActivo.turnoId);
+
+        if (existe) turno.value = turnoActivo.turnoId;
+      }
+
+      resultado.textContent =
+        (data.turnos || []).length
+          ? 'Selecciona Consultar para ver los movimientos.'
+          : 'No hay turnos para esa fecha.';
+
+    } catch (error) {
+      resultado.textContent = error.message;
+    }
+  };
+
+  fecha.onchange = cargarTurnos;
+
+  modal.querySelector(
+    '#detalleBuscarChombo'
+  ).onclick = async () => {
+
+    if (!turno.value) {
+      resultado.textContent =
+        'Selecciona un turno.';
+      return;
+    }
+
+    resultado.textContent =
+      'Consultando operaciones...';
+
+    try {
+      const data = await jsonpRequest(
+        'detalle_consultar',
+        {turnoId: turno.value}
+      );
+
+      if (!data?.ok) {
+        throw new Error(
+          data?.message || 'Error consultando detalle.'
+        );
+      }
+
+      const registros = data.registros || [];
+
+      if (!registros.length) {
+        resultado.textContent =
+          'No hay operaciones detalladas guardadas ' +
+          'para este turno.';
+        return;
+      }
+
+      const esc = valor => String(valor ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+      const moneda = valor =>
+        Number(valor || 0).toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        });
+
+      const suma = campo => registros.reduce(
+        (total, r) => total + Number(r[campo] || 0),
+        0
+      );
+
+      resultado.innerHTML = `
+        <p><b>TurnoID:</b> ${esc(turno.value)}</p>
+        <p><b>Operaciones:</b> ${registros.length}</p>
+
+        <table style="
+          border-collapse:collapse;
+          width:100%;
+          font-size:13px;
+        ">
+          <thead>
+            <tr style="background:#e8eef7">
+              ${[
+                'Fecha','Hora','Módulo','Movimiento',
+                'Descripción','Parcial','Entradas','Salidas'
+              ].map(x => `
+                <th style="border:1px solid #bbb;padding:7px">
+                  ${x}
+                </th>
+              `).join('')}
+            </tr>
+          </thead>
+          <tbody>
+            ${registros.map(r => `
+              <tr>
+                ${[
+                  r.fecha,r.hora,r.modulo,
+                  r.movimiento,r.descripcion
+                ].map(x => `
+                  <td style="border:1px solid #ccc;padding:6px">
+                    ${esc(x)}
+                  </td>
+                `).join('')}
+                ${[
+                  r.parcial,r.entrada,r.salida
+                ].map(x => `
+                  <td style="
+                    border:1px solid #ccc;
+                    padding:6px;
+                    text-align:right
+                  ">
+                    ${moneda(x)}
+                  </td>
+                `).join('')}
+              </tr>
+            `).join('')}
+          </tbody>
+          <tfoot>
+            <tr style="background:#e8eef7;font-weight:bold">
+              <td colspan="5" style="
+                border:1px solid #bbb;padding:7px
+              ">SUMA</td>
+              ${['parcial','entrada','salida'].map(c => `
+                <td style="
+                  border:1px solid #bbb;
+                  padding:7px;
+                  text-align:right
+                ">${moneda(suma(c))}</td>
+              `).join('')}
+            </tr>
+          </tfoot>
+        </table>
+      `;
+
+    } catch (error) {
+      resultado.textContent = error.message;
+    }
+  };
+
+  await cargarTurnos();
 }
 
 
