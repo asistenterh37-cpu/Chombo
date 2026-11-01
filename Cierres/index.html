@@ -3123,7 +3123,7 @@ tr{
 <script>
 
 const SCRIPT_URL =
-'https://script.google.com/macros/s/AKfycbxMTO8Sq1N-DHhDe9uK9Fx5ECza_pD9c5QwG9dnowpSvGj_yAplL4W0VMH5vfwCTlow/exec';
+'https://script.google.com/macros/s/AKfycbyx3GEQGPVsI-atbmD0ijmCpNxVU42O7sAHRQfUUzrfNbxNpXJyHQKkChu_YVhJiEJ6/exec';
 
 </script>
 
@@ -4176,21 +4176,26 @@ const SCRIPT_URL =
     </div>
 
 
-    <div class="turno-field full">
+  <div class="turno-field">
+  <label>Responsable</label>
 
-     <label>
-      Responsable
-     </label>
+  <select id="turnoResponsable">
+    <option value="">Seleccionar</option>
+  </select>
+</div>
 
-     <select id="turnoResponsable">
+<div class="turno-field">
+  <label>Caja No</label>
 
-      <option value="">
-       Seleccionar
-      </option>
-
-     </select>
-
-    </div>
+  <select id="turnoCajaNo">
+    <option value="">Seleccionar</option>
+    <option value="1">1</option>
+    <option value="2">2</option>
+    <option value="3">3</option>
+    <option value="4">4</option>
+    <option value="5">5</option>
+  </select>
+</div>
 
 
    </div>
@@ -10601,7 +10606,8 @@ function prepararIniciarTurno(){
 
  $('turnoResponsable').value =
   '';
-
+$('turnoCajaNo').value = '';
+  
 
  const ultimaUbicacion =
   localStorage.getItem(
@@ -10966,9 +10972,11 @@ async function guardarTurno(){
   $('turnoUbicacion').value;
 
 
- const responsable =
+const responsable =
   $('turnoResponsable').value;
 
+const cajaNo =
+  Number($('turnoCajaNo').value);
 
  if(!ubicacion){
 
@@ -10997,7 +11005,19 @@ async function guardarTurno(){
 
  }
 
+if (
+  !Number.isInteger(cajaNo) ||
+  cajaNo < 1 ||
+  cajaNo > 5
+) {
+  toast(
+    'Selecciona Caja No del 1 al 5.',
+    false
+  );
 
+  $('turnoCajaNo').focus();
+  return;
+}
  const btn =
   $('turnoActionBtn');
 
@@ -11012,16 +11032,11 @@ async function guardarTurno(){
 
  try{
 
-  const payload = {
-
-   ubicacion:
-    ubicacion,
-
-   responsable:
-    responsable
-
-  };
-
+const payload = {
+  ubicacion: ubicacion,
+  responsable: responsable,
+  cajaNo: cajaNo
+};
 
   const data =
    await jsonpRequest(
@@ -14244,55 +14259,34 @@ if (
         );
 
 
-      if(inicialEl){
+      const formatoSaldo = valor =>
+  Number(valor ?? 0).toLocaleString(
+    'en-US',
+    {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }
+  );
 
-        inicialEl.textContent =
-          Math.round(
-            dato.inicial
-          )
-          .toLocaleString(
-            'en-US'
-          );
+if (inicialEl) {
+  inicialEl.textContent =
+    formatoSaldo(dato.inicial);
+}
 
-      }
+if (entradasEl) {
+  entradasEl.textContent =
+    formatoSaldo(dato.entradas);
+}
 
+if (salidasEl) {
+  salidasEl.textContent =
+    formatoSaldo(dato.salidas);
+}
 
-      if(entradasEl){
-
-        entradasEl.textContent =
-          Math.round(
-            dato.entradas
-          )
-          .toLocaleString(
-            'en-US'
-          );
-
-      }
-
-
-      if(salidasEl){
-
-        salidasEl.textContent =
-          Math.round(
-            dato.salidas
-          )
-          .toLocaleString(
-            'en-US'
-          );
-
-      }
-
-
-      if(finalEl){
-
-        finalEl.textContent =
-          Math.round(
-            dato.final
-          )
-          .toLocaleString(
-            'en-US'
-          );
-
+if (finalEl) {
+  finalEl.textContent =
+    formatoSaldo(dato.final);
+}
       }
 
     }
