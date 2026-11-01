@@ -14375,12 +14375,17 @@ if (
         );
 
 
-      const salidasEl =
+            const salidasEl =
         $(
           'saldoSalidas_' +
           clave
         );
 
+      const finalEl =
+        $(
+          'saldoFinal_' +
+          clave
+        );
 
 
       const formatoSaldo = valor =>
@@ -19062,150 +19067,96 @@ async function guardarCreditoFilaSiAplica(
   `;
 
 
-  /* ==================================================
-     RECUPERAR FILAS, HABILITAR IMPORTES Y DECIMALES
-     NO MODIFICAR OTRAS FUNCIONES DEL FORMULARIO
-  ================================================== */
+/* ======================================================
+   RECUPERACIÓN Y EDICIÓN DE FILAS DE OPERACIONES
 
-  const selectModulo =
-    tr.querySelector('.operacion-modulo');
+   - Mantiene los campos del formulario
+   - Respeta Entrada / Salida / Parcial del catálogo
+   - Permite editar múltiples veces
+   - Admite importes con decimales
+   - Calcula operaciones aritméticas
+   - Conserva los valores para Guardar
+   - No agrega eventos duplicados
+====================================================== */
 
-  const selectMovimiento =
-    tr.querySelector('.operacion-movimiento');
+  const selectModulo = tr.querySelector(
+    '.operacion-modulo'
+  );
 
-  const parcial =
-    tr.querySelector('.operacion-parcial');
+  const selectMovimiento = tr.querySelector(
+    '.operacion-movimiento'
+  );
 
-  const entrada =
-    tr.querySelector('.operacion-entrada');
+  const parcial = tr.querySelector(
+    '.operacion-parcial'
+  );
 
-  const salida =
-    tr.querySelector('.operacion-salida');
+  const entrada = tr.querySelector(
+    '.operacion-entrada'
+  );
 
-  const moduloGuardado =
-    String(datos.modulo ?? '').trim();
+  const salida = tr.querySelector(
+    '.operacion-salida'
+  );
 
-  const movimientoGuardado =
-    String(datos.movimiento ?? '').trim();
+  const moduloGuardado = String(
+    datos.modulo ?? ''
+  ).trim();
 
-  const camposNumericos =
-    [parcial, entrada, salida].filter(Boolean);
+  const movimientoGuardado = String(
+    datos.movimiento ?? ''
+  ).trim();
+
+  const descripcionGuardada = String(
+    datos.descripcion ?? ''
+  );
+
+  const camposMonto = [
+    parcial,
+    entrada,
+    salida
+  ].filter(Boolean);
 
   /* ----------------------------------------------
-     NORMALIZAR DECIMALES
-     Acepta 125.50 y 125,50
-     Conserva separadores de miles
+     1. Preparar entradas numéricas.
+     No bloquear permanentemente ningún campo.
   ---------------------------------------------- */
 
-  function normalizarDecimalFila(valor) {
+  camposMonto.forEach(campo => {
 
-    let texto = String(valor ?? '').trim();
-
-    if (/^\d+,\d{1,2}$/.test(texto)) {
-      texto = texto.replace(',', '.');
-    }
-
-    return texto;
-  }
-
-  /* ----------------------------------------------
-     PREPARAR CAMPOS
-     NO DEJARLOS EN SOLO LECTURA
-  ---------------------------------------------- */
-
-  camposNumericos.forEach(campo => {
-
-    campo.readOnly = false;
+    campo.type = 'text';
     campo.inputMode = 'decimal';
     campo.autocomplete = 'off';
 
-    // Cada columna se habilitará de acuerdo
-    // con el movimiento seleccionado.
+    campo.readOnly = false;
+
+    // Estado inicial: se habilita al seleccionar
+    // un movimiento válido.
 
     campo.disabled = true;
 
-    /* ------------------------------------------
-       MIENTRAS SE ESCRIBE
-    ------------------------------------------ */
-
-    campo.addEventListener('input', () => {
-
-      campo.value =
-        normalizarDecimalFila(campo.value);
-
-      marcarHoraFilaOperacion(campo);
-
-      recalcularTotalesOperaciones();
-
-    });
-
-    /* ------------------------------------------
-       AL SALIR DE LA CELDA
-       CALCULAR SUMAS Y FIJAR DOS DECIMALES
-    ------------------------------------------ */
-
-    campo.addEventListener('blur', () => {
-
-      if (campo.disabled || campo.readOnly) {
-        return;
-      }
-
-      const texto =
-        normalizarDecimalFila(campo.value);
-
-      if (!texto) {
-        campo.value = '';
-        recalcularTotalesOperaciones();
-        return;
-      }
-
-      try {
-
-        const resultado =
-          evaluarOperacionMonto(texto);
-
-        if (resultado === null) {
-          campo.value = '';
-          return;
-        }
-
-        campo.value =
-          Number(resultado).toFixed(2);
-
-        marcarHoraFilaOperacion(campo);
-
-        recalcularTotalesOperaciones();
-
-      } catch (error) {
-
-        // No borrar lo escrito cuando
-        // todavía exista un valor incorrecto.
-
-        campo.value = texto;
-
-        campo.setCustomValidity(
-          'Introduce un número o una suma válida.'
-        );
-
-        campo.reportValidity();
-
-        campo.setCustomValidity('');
-
-      }
-
-    });
+    campo.classList.add(
+      'operacion-bloqueada'
+    );
 
   });
 
   /* ----------------------------------------------
-     RESTAURAR MÓDULO GUARDADO
+     2. Recuperar el módulo seleccionado.
   ---------------------------------------------- */
 
-  if (selectModulo && moduloGuardado) {
+  if (
+    selectModulo &&
+    moduloGuardado
+  ) {
 
-    selectModulo.value = moduloGuardado;
+    const existeModulo = Array.from(
+      selectModulo.options
+    ).some(opcion =>
+      opcion.value === moduloGuardado
+    );
 
-    if (selectModulo.value !== moduloGuardado) {
+    if (!existeModulo) {
 
       selectModulo.add(
         new Option(
@@ -19214,14 +19165,15 @@ async function guardarCreditoFilaSiAplica(
         )
       );
 
-      selectModulo.value = moduloGuardado;
-
     }
+
+    selectModulo.value = moduloGuardado;
 
   }
 
   /* ----------------------------------------------
-     RESTAURAR MOVIMIENTOS DEL CATÁLOGO
+     3. Recuperar movimientos sin duplicar
+        eventos ni borrar el catálogo.
   ---------------------------------------------- */
 
   if (selectMovimiento) {
@@ -19229,10 +19181,13 @@ async function guardarCreditoFilaSiAplica(
     selectMovimiento.innerHTML =
       '<option value="">Seleccionar</option>';
 
-    if (moduloGuardado) {
+    const moduloActual =
+      selectModulo?.value || '';
+
+    if (moduloActual) {
 
       const movimientos =
-        movimientosPorModulo(moduloGuardado);
+        movimientosPorModulo(moduloActual);
 
       movimientos.forEach(nombre => {
 
@@ -19246,13 +19201,13 @@ async function guardarCreditoFilaSiAplica(
 
     if (movimientoGuardado) {
 
-      selectMovimiento.value =
-        movimientoGuardado;
+      const existeMovimiento = Array.from(
+        selectMovimiento.options
+      ).some(opcion =>
+        opcion.value === movimientoGuardado
+      );
 
-      if (
-        selectMovimiento.value !==
-        movimientoGuardado
-      ) {
+      if (!existeMovimiento) {
 
         selectMovimiento.add(
           new Option(
@@ -19261,159 +19216,204 @@ async function guardarCreditoFilaSiAplica(
           )
         );
 
-        selectMovimiento.value =
-          movimientoGuardado;
-
       }
+
+      selectMovimiento.value =
+        movimientoGuardado;
 
     }
 
   }
 
   /* ----------------------------------------------
-     HABILITAR CAMPOS SEGÚN EL CATÁLOGO
-     I = Entrada, J = Salida
-     Ambas vacías = Parcial
+     4. Aplicar una sola vez la naturaleza
+        del movimiento.
+
+     El catálogo determina:
+       Entrada = columna I con X
+       Salida  = columna J con X
+       Parcial = ambas columnas sin X
   ---------------------------------------------- */
 
-  function habilitarImportesFila() {
-
-    camposNumericos.forEach(campo => {
-      campo.readOnly = false;
-    });
-
-    if (
-      !selectModulo?.value ||
-      !selectMovimiento?.value
-    ) {
-
-      camposNumericos.forEach(campo => {
-
-        campo.disabled = true;
-
-        campo.classList.add(
-          'operacion-bloqueada'
-        );
-
-      });
-
-      return;
-    }
+  if (
+    selectMovimiento &&
+    selectModulo?.value &&
+    selectMovimiento.value
+  ) {
 
     aplicarNaturalezaMovimiento(
       selectMovimiento
     );
 
-    camposNumericos.forEach(campo => {
-
-      campo.readOnly = false;
-
-      if (campo.disabled) {
-
-        campo.classList.add(
-          'operacion-bloqueada'
-        );
-
-      } else {
-
-        campo.classList.remove(
-          'operacion-bloqueada'
-        );
-
-      }
-
-    });
-
   }
 
   /* ----------------------------------------------
-     CAMBIO DE MÓDULO O MOVIMIENTO
-     SE EJECUTA DESPUÉS DE LOS EVENTOS EXISTENTES
+     5. Recuperar valores guardados.
+
+     Se restauran DESPUÉS de aplicar la naturaleza,
+     evitando que la inicialización los borre.
   ---------------------------------------------- */
 
-  if (selectModulo) {
+  function valorRecuperado(valor) {
 
-    selectModulo.addEventListener(
-      'change',
-      () => {
+    if (
+      valor === undefined ||
+      valor === null ||
+      valor === ''
+    ) {
+      return '';
+    }
 
-        habilitarImportesFila();
+    const texto = String(valor).trim();
 
-        recalcularTotalesOperaciones();
+    // Normalizar una coma decimal simple.
 
-      }
-    );
+    if (/^-?\d+,\d{1,2}$/.test(texto)) {
+      return texto.replace(',', '.');
+    }
 
-  }
-
-  if (selectMovimiento) {
-
-    selectMovimiento.addEventListener(
-      'change',
-      () => {
-
-        habilitarImportesFila();
-
-        recalcularTotalesOperaciones();
-
-      }
-    );
+    return texto;
 
   }
-
-  /* ----------------------------------------------
-     RESTAURAR VALORES EXISTENTES
-     SIN PERDER SUS DECIMALES
-  ---------------------------------------------- */
-
-  if (moduloGuardado && movimientoGuardado) {
-
-    actualizarDescripcionFila(
-      selectMovimiento,
-      datos.descripcion || ''
-    );
-
-  }
-
-  habilitarImportesFila();
 
   if (parcial && !parcial.disabled) {
-
-    parcial.value =
-      normalizarDecimalFila(
-        datos.parcial ?? ''
-      );
-
+    parcial.value = valorRecuperado(
+      datos.parcial
+    );
   }
 
   if (entrada && !entrada.disabled) {
-
-    entrada.value =
-      normalizarDecimalFila(
-        datos.entrada ?? ''
-      );
-
+    entrada.value = valorRecuperado(
+      datos.entrada
+    );
   }
 
   if (salida && !salida.disabled) {
+    salida.value = valorRecuperado(
+      datos.salida
+    );
+  }
 
-    salida.value =
-      normalizarDecimalFila(
-        datos.salida ?? ''
-      );
+  /* ----------------------------------------------
+     6. Recuperar descripción.
+     Conservar las listas de clientes,
+     empleados y proveedores.
+  ---------------------------------------------- */
+
+  if (
+    selectMovimiento &&
+    selectModulo?.value &&
+    selectMovimiento.value
+  ) {
+
+    actualizarDescripcionFila(
+      selectMovimiento,
+      descripcionGuardada
+    );
 
   }
 
   /* ----------------------------------------------
-     DEVOLVER LA FILA COMPLETA
-     ES INDISPENSABLE PARA MOSTRARLA EN PANTALLA
+     7. Procesar números y operaciones al salir
+        de una celda.
+
+     Ejemplos:
+       100.25
+       100.25+50.35
+       1,500.75
+  ---------------------------------------------- */
+
+  camposMonto.forEach(campo => {
+
+    campo.addEventListener(
+      'blur',
+      function() {
+
+        if (
+          this.disabled ||
+          this.readOnly
+        ) {
+          return;
+        }
+
+        let texto = String(
+          this.value || ''
+        ).trim();
+
+        if (!texto) {
+          return;
+        }
+
+        // Admitir coma decimal cuando no sea
+        // separador de millares.
+
+        if (/^-?\d+,\d{1,2}$/.test(texto)) {
+          texto = texto.replace(',', '.');
+        }
+
+        try {
+
+          const resultado =
+            evaluarOperacionMonto(texto);
+
+          if (resultado === null) {
+            return;
+          }
+
+          this.value =
+            Number(resultado).toFixed(2);
+
+          recalcularTotalesOperaciones();
+
+        } catch (error) {
+
+          // Conservar el dato para corregirlo.
+          // Nunca borrar silenciosamente
+          // un importe inválido.
+
+          this.value = texto;
+
+          toast(
+            'Revisa el importe: ' + texto,
+            false
+          );
+
+        }
+
+      }
+    );
+
+  });
+
+  /* ----------------------------------------------
+     8. Mantener los eventos ya existentes.
+
+     El HTML original ya ejecuta:
+       marcarHoraFilaOperacion()
+       procesarMontoConEnter()
+       actualizarMovimientoFila()
+       aplicarNaturalezaMovimiento()
+
+     No duplicamos esos eventos.
+     Tampoco reconstruimos las filas al escribir.
+  ---------------------------------------------- */
+
+  /* ----------------------------------------------
+     9. Devolver la fila íntegra.
+
+     Indispensable para:
+       - Mostrar las 20 filas iniciales
+       - Agregar filas nuevas
+       - Conservar el módulo
+       - Conservar movimiento y descripción
+       - Leer importes al guardar
   ---------------------------------------------- */
 
   return tr;
 
 }
 
-/* ================================================
+    /* ================================================
    NAVEGACION POR FLECHAS EN REGISTRO OPERACIONES
 ================================================ */
 
