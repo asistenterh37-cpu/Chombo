@@ -26233,9 +26233,12 @@ function construirReporteImpresionChombo(datos) {
       <div class="ticket-encabezado">
         <p><strong>Cierre de turno</strong></p>
         <p><strong>Turno ID:</strong> ${esc(datos.turnoId)}</p>
+        
         <p><strong>Fecha:</strong> ${esc(fechaTexto)}</p>
         <p><strong>Ubicación:</strong> ${esc(datos.ubicacion)}</p>
         <p><strong>Responsable:</strong> ${esc(datos.responsable)}</p>
+        <p><strong>Caja No:</strong> ${esc(datos.cajaNo ?? '')}</p>
+
       </div>
 
       <table class="ticket-tabla-movimientos">
