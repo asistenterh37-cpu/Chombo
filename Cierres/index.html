@@ -26518,14 +26518,23 @@ ${contenido}
    No modifica el formulario ni la impresión.
 ====================================================== */
 
+
 function capturarDetalleChombo() {
+  const filas = document.querySelectorAll('#operacionesFilas .fila-operacion');
 
-  const filas = document.querySelectorAll(
-    '#operacionesFilas .fila-operacion'
-  );
+  const leerNumero = valor => {
+    const n = Number(
+      String(valor ?? '').replace(/,/g, '').trim() || 0
+    );
 
-  return Array.from(filas).map(fila => {
+    if (!Number.isFinite(n)) {
+      throw new Error('Monto inválido en Detalle.');
+    }
 
+    return Math.round((n + Number.EPSILON) * 100) / 100;
+  };
+
+  const detalle = Array.from(filas).map(fila => {
     const leer = clase =>
       fila.querySelector(clase)?.value?.trim() || '';
 
@@ -26542,49 +26551,73 @@ function capturarDetalleChombo() {
     }
 
     if (!fila.dataset.chomboDetalleId) {
-      fila.dataset.chomboDetalleId =
-        'OP-' + (
-          typeof crypto !== 'undefined' &&
-          typeof crypto.randomUUID === 'function'
-            ? crypto.randomUUID()
-            : Date.now() + '-' +
-              Math.random().toString(36).slice(2)
-        );
+      fila.dataset.chomboDetalleId = 'OP-' + (
+        typeof crypto !== 'undefined' &&
+        typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : Date.now() + '-' +
+            Math.random().toString(36).slice(2)
+      );
     }
-
-    const monto = clase => {
-      const texto = leer(clase);
-      if (!texto) return 0;
-
-      const valor = Number(texto.replace(/,/g, ''));
-
-      if (!Number.isFinite(valor)) {
-        throw new Error(
-          'Importe inválido en ' + modulo +
-          ' / ' + movimiento
-        );
-      }
-
-      return Math.round(
-        (valor + Number.EPSILON) * 100
-      ) / 100;
-    };
 
     return {
       idOperacion: fila.dataset.chomboDetalleId,
-      hora: leer('.operacion-hora'),
-      modulo: modulo,
-      movimiento: movimiento,
+      modulo,
+      movimiento,
       descripcion: leer('.operacion-descripcion'),
-      parcial: monto('.operacion-parcial'),
-      entrada: monto('.operacion-entrada'),
-      salida: monto('.operacion-salida')
+      parcial: leerNumero(leer('.operacion-parcial')),
+      entrada: leerNumero(leer('.operacion-entrada')),
+      salida: leerNumero(leer('.operacion-salida'))
+    };
+  }).filter(Boolean);
+
+  // CONTROL DE VENTAS
+  // Los conceptos se registran en Módulo.
+  // El ID permanece estable por turno y concepto.
+
+  const control = [
+    ['Apertura caja', 'opAperturaCaja', 'entrada'],
+    ['Ventas CAI', 'opVentasCai', 'parcial'],
+    ['Ventas botón', 'opVentasBoton', 'parcial'],
+    ['Ventas totales', 'opVentasTotales', 'entrada'],
+    ['Efectivo', 'opPagoEfectivo', 'parcial'],
+    ['Crédito', 'opPagoCredito', 'parcial'],
+    ['Tarjetas de crédito', 'opPagoTarjetasCredito', 'parcial'],
+    ['Link de pago', 'opPagoLink', 'parcial'],
+    ['Transferencias', 'opPagoTransferencias', 'parcial'],
+    ['Tarjetas varias', 'opPagoTarjetasVarias', 'parcial'],
+    ['Tigo Money', 'opPagoTigoMoney', 'parcial'],
+    ['Total formas de pago', 'opTotalFormasPago', 'entrada']
+  ];
+
+  const tid = String(
+    turnoActivo?.turnoId || ''
+  ).trim();
+
+  control.forEach(([modulo, id, columna]) => {
+    const elemento = document.getElementById(id);
+
+    if (!elemento) return;
+
+    const registro = {
+      idOperacion: 'CTRL-' + tid + '-' + id,
+      modulo,
+      movimiento: '',
+      descripcion: '',
+      parcial: 0,
+      entrada: 0,
+      salida: 0
     };
 
-  }).filter(Boolean);
+    registro[columna] = leerNumero(elemento.value);
+
+    detalle.push(registro);
+  });
+
+  return detalle;
 }
 
-
+  
 /* ======================================================
    VENTANA DE CONSULTA
 ====================================================== */
