@@ -26519,61 +26519,31 @@ ${contenido}
 ====================================================== */
 
 
+
 function capturarDetalleChombo() {
-  const filas = document.querySelectorAll('#operacionesFilas .fila-operacion');
 
   const leerNumero = valor => {
     const n = Number(
-      String(valor ?? '').replace(/,/g, '').trim() || 0
+      String(valor ?? '')
+        .replace(/,/g, '')
+        .trim() || 0
     );
 
     if (!Number.isFinite(n)) {
       throw new Error('Monto inválido en Detalle.');
     }
 
-    return Math.round((n + Number.EPSILON) * 100) / 100;
+    return Math.round(
+      (n + Number.EPSILON) * 100
+    ) / 100;
   };
 
-  const detalle = Array.from(filas).map(fila => {
-    const leer = clase =>
-      fila.querySelector(clase)?.value?.trim() || '';
+  const detalle = [];
 
-    const modulo = leer('.operacion-modulo');
-    const movimiento = leer('.operacion-movimiento');
-
-    if (
-      !modulo ||
-      !movimiento ||
-      modulo.toLowerCase() === 'seleccionar' ||
-      movimiento.toLowerCase() === 'seleccionar'
-    ) {
-      return null;
-    }
-
-    if (!fila.dataset.chomboDetalleId) {
-      fila.dataset.chomboDetalleId = 'OP-' + (
-        typeof crypto !== 'undefined' &&
-        typeof crypto.randomUUID === 'function'
-          ? crypto.randomUUID()
-          : Date.now() + '-' +
-            Math.random().toString(36).slice(2)
-      );
-    }
-
-    return {
-      idOperacion: fila.dataset.chomboDetalleId,
-      modulo,
-      movimiento,
-      descripcion: leer('.operacion-descripcion'),
-      parcial: leerNumero(leer('.operacion-parcial')),
-      entrada: leerNumero(leer('.operacion-entrada')),
-      salida: leerNumero(leer('.operacion-salida'))
-    };
-  }).filter(Boolean);
-
-  // CONTROL DE VENTAS
-  // Los conceptos se registran en Módulo.
-  // El ID permanece estable por turno y concepto.
+  /* ============================================
+     PRIMERO: CONTROL DE VENTAS
+     Se guarda en la columna Módulo.
+  ============================================ */
 
   const control = [
     ['Apertura caja', 'opAperturaCaja', 'entrada'],
@@ -26595,13 +26565,16 @@ function capturarDetalleChombo() {
   ).trim();
 
   control.forEach(([modulo, id, columna]) => {
+
     const elemento = document.getElementById(id);
 
     if (!elemento) return;
 
+    const valor = leerNumero(elemento.value);
+
     const registro = {
       idOperacion: 'CTRL-' + tid + '-' + id,
-      modulo,
+      modulo: modulo,
       movimiento: '',
       descripcion: '',
       parcial: 0,
@@ -26609,12 +26582,82 @@ function capturarDetalleChombo() {
       salida: 0
     };
 
-    registro[columna] = leerNumero(elemento.value);
+    registro[columna] = valor;
+
+    /* ============================================
+       EFECTIVO
+       Parcial también debe aparecer en Entradas.
+    ============================================ */
+
+    if (modulo === 'Efectivo') {
+      registro.parcial = valor;
+      registro.entrada = valor;
+    }
 
     detalle.push(registro);
+
+  });
+
+  /* ============================================
+     SEGUNDO: REGISTRO DE OPERACIONES
+
+     Atlántida, Bac, Banpais y demás módulos.
+     Conservar sus valores originales.
+  ============================================ */
+
+  const filas = document.querySelectorAll(
+    '#operacionesFilas .fila-operacion'
+  );
+
+  Array.from(filas).forEach(fila => {
+
+    const leer = clase =>
+      fila.querySelector(clase)?.value?.trim() || '';
+
+    const modulo = leer('.operacion-modulo');
+    const movimiento = leer('.operacion-movimiento');
+
+    if (
+      !modulo ||
+      !movimiento ||
+      modulo.toLowerCase() === 'seleccionar' ||
+      movimiento.toLowerCase() === 'seleccionar'
+    ) {
+      return;
+    }
+
+    if (!fila.dataset.chomboDetalleId) {
+
+      fila.dataset.chomboDetalleId = 'OP-' + (
+        typeof crypto !== 'undefined' &&
+        typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : Date.now() + '-' +
+            Math.random().toString(36).slice(2)
+      );
+
+    }
+
+    detalle.push({
+      idOperacion: fila.dataset.chomboDetalleId,
+      modulo: modulo,
+      movimiento: movimiento,
+      descripcion: leer('.operacion-descripcion'),
+      parcial: leerNumero(
+        leer('.operacion-parcial')
+      ),
+      entrada: leerNumero(
+        leer('.operacion-entrada')
+      ),
+      salida: leerNumero(
+        leer('.operacion-salida')
+      )
+    });
+
   });
 
   return detalle;
+
 }
 
   
