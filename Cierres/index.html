@@ -14007,6 +14007,31 @@ function obtenerSaldoInicialResumen(
   return 0;
 
 }
+
+
+/* ==========================================
+   IDENTIFICAR DÉBITOS RECIBIDOS
+   ATLÁNTIDA, BAC Y BANPAIS
+========================================== */
+
+function esDebitoInternoChombo(modulo, movimiento) {
+
+  const m = normalizarModuloOperacion(modulo);
+  const v = normalizarModuloOperacion(movimiento);
+
+  return (
+    [
+      'atlantida',
+      'agente atlantida',
+      'bac',
+      'rapibac',
+      'banpais'
+    ].includes(m)
+    &&
+    v === 'debitos recibidos'
+  );
+
+}
   
   
 function actualizarResumenSaldos(){
@@ -14286,6 +14311,24 @@ const esModuloEspecial =
   modulosEspeciales.includes(
     moduloNormalizado
   );
+
+
+/* ==========================================
+   DÉBITOS RECIBIDOS
+   AUMENTAN EL SALDO DEL BANCO
+========================================== */
+
+if (esDebitoInternoChombo(modulo, movimiento)) {
+
+  resumen[clave].entradas += Math.abs(entrada);
+
+  return;
+
+}
+
+/* ==========================================
+   CONSERVAR CRÉDITO TOTAL
+========================================== */
 
 if (
   esModuloEspecial &&
@@ -14778,14 +14821,33 @@ async function guardarTotalesTurno(){
           );
 
 
-        acumulados[
-          clave
-        ].entrada +=
-          numeroOperacion(
-            fila.querySelector(
-              '.operacion-entrada'
-            )?.value
-          );
+      
+/* ==========================================
+   EXCLUIR DÉBITOS RECIBIDOS DEL
+   TOTAL DE ENTRADAS GUARDADAS
+========================================== */
+
+const movimientoFila =
+  fila.querySelector(
+    '.operacion-movimiento'
+  )?.value || '';
+
+if (
+  !esDebitoInternoChombo(
+    modulo,
+    movimientoFila
+  )
+) {
+
+  acumulados[clave].entrada +=
+    numeroOperacion(
+      fila.querySelector(
+        '.operacion-entrada'
+      )?.value
+    );
+
+}
+
 
 
         acumulados[
@@ -15941,30 +16003,78 @@ function recalcularTotalesOperaciones(){
     0;
 
 
-  /* ===============================================
-     SUMAR TODAS LAS ENTRADAS
+/* ===============================================
+   SUMAR ENTRADAS DEL TURNO
 
-     Se suman todos los valores existentes,
-     incluso si luego la fila quedó bloqueada
-     o en solo lectura.
-  =============================================== */
+   Débitos recibidos:
+   - Aumentan Saldos
+   - No aumentan Total Entradas
+   - Celda con fondo gris
+   - Mantienen edición y decimales
+=============================================== */
 
-  document
-    .querySelectorAll(
-      '#operacionesFilas .operacion-entrada'
-    )
-    .forEach(
-      campo => {
+document
+  .querySelectorAll(
+    '#operacionesFilas .operacion-entrada'
+  )
+  .forEach(campo => {
 
-        entradasMovimientos +=
-          numeroOperacion(
-            campo.value
-          );
+    const fila =
+      campo.closest('.fila-operacion');
 
-      }
-    );
+    const modulo =
+      fila?.querySelector(
+        '.operacion-modulo'
+      )?.value || '';
+
+    const movimiento =
+      fila?.querySelector(
+        '.operacion-movimiento'
+      )?.value || '';
+
+    const esDebito =
+      esDebitoInternoChombo(
+        modulo,
+        movimiento
+      );
+
+    const celda =
+      campo.closest('td');
+
+    /* COLOR GRIS PARA DÉBITOS RECIBIDOS */
+
+    if (celda) {
+
+      celda.style.setProperty(
+        'background-color',
+        esDebito ? '#d9d9d9' : '',
+        'important'
+      );
+
+      celda.style.setProperty(
+        'background-image',
+        esDebito ? 'none' : '',
+        'important'
+      );
+
+    }
+
+    campo.style.backgroundColor =
+      esDebito ? '#d9d9d9' : '';
+
+    /* NO SUMAR DÉBITOS AL TOTAL GENERAL */
+
+    if (!esDebito) {
+
+      entradasMovimientos +=
+        numeroOperacion(campo.value);
+
+    }
+
+  });
 
 
+  
   /* ===============================================
      SUMAR TODAS LAS SALIDAS
   =============================================== */
@@ -26863,10 +26973,26 @@ async function abrirConsultaDetalleChombo() {
           maximumFractionDigits: 2
         });
 
-      const suma = campo => registros.reduce(
-        (total, r) => total + Number(r[campo] || 0),
-        0
-      );
+     
+const suma = campo => registros.reduce(
+  (total, r) => {
+
+    if (
+      campo === 'entrada' &&
+      esDebitoInternoChombo(
+        r.modulo,
+        r.movimiento
+      )
+    ) {
+      return total;
+    }
+
+    return total + Number(r[campo] || 0);
+
+  },
+  0
+);
+
 
       resultado.innerHTML = `
         <p><b>TurnoID:</b> ${esc(turno.value)}</p>
