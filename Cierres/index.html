@@ -14009,26 +14009,81 @@ function obtenerSaldoInicialResumen(
 }
 
 
-/* ==========================================
-   IDENTIFICAR DÉBITOS RECIBIDOS
-   ATLÁNTIDA, BAC Y BANPAIS
-========================================== */
+/* ======================================================
+   MOVIMIENTOS ESPECIALES DE INGRESO A SALDOS
 
-function esDebitoInternoChombo(modulo, movimiento) {
+   BANCOS:
+   Débitos recibidos / Dennys
+
+   RECARGAS Y DINERO ELECTRÓNICO:
+   Créditos electro recibidos
+
+   REGLAS:
+   1. Se registran en Entradas.
+   2. Aumentan los Saldos correspondientes.
+   3. No suman al Total general de Entradas.
+   4. Conservan sus valores en Detalle.
+   5. Permiten valores con dos decimales.
+====================================================== */
+
+function esIngresoEspecialChombo(modulo, movimiento) {
 
   const m = normalizarModuloOperacion(modulo);
   const v = normalizarModuloOperacion(movimiento);
 
-  return (
-    [
-      'atlantida',
-      'agente atlantida',
-      'bac',
-      'rapibac',
-      'banpais'
-    ].includes(m)
-    &&
-    v === 'debitos recibidos'
+  const bancos = [
+    'atlantida',
+    'agente atlantida',
+    'bac',
+    'rapibac',
+    'banpais'
+  ];
+
+  const cuentasElectronicas = [
+    'claro recargas',
+    'claro recarga',
+    'recargas claro',
+    'tigo money',
+    'tigo recargas',
+    'recargas tigo'
+  ];
+
+  /* BANCOS */
+
+  if (
+    bancos.includes(m) &&
+    (
+      v === 'debitos recibidos / dennys' ||
+      v === 'debitos recibidos'
+    )
+  ) {
+    return true;
+  }
+
+  /* RECARGAS Y DINERO ELECTRÓNICO */
+
+  if (
+    cuentasElectronicas.includes(m) &&
+    v === 'creditos electro recibidos'
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/* ======================================================
+   COMPATIBILIDAD CON LA FUNCIÓN ANTERIOR
+
+   Permite conservar las llamadas existentes
+   sin alterar otras funciones.
+====================================================== */
+
+function esDebitoInternoChombo(modulo, movimiento) {
+
+  return esIngresoEspecialChombo(
+    modulo,
+    movimiento
   );
 
 }
@@ -14313,14 +14368,25 @@ const esModuloEspecial =
   );
 
 
-/* ==========================================
-   DÉBITOS RECIBIDOS
-   AUMENTAN EL SALDO DEL BANCO
-========================================== */
+/* ======================================================
+   INGRESOS ESPECIALES QUE AUMENTAN SALDOS
 
-if (esDebitoInternoChombo(modulo, movimiento)) {
+   Atlántida, Bac, Banpais:
+   Débitos recibidos / Dennys
 
-  resumen[clave].entradas += Math.abs(entrada);
+   Claro recargas, Tigo money y Tigo recargas:
+   Créditos electro recibidos
+====================================================== */
+
+if (
+  esIngresoEspecialChombo(
+    modulo,
+    movimiento
+  )
+) {
+
+  resumen[clave].entradas +=
+    Math.abs(entrada);
 
   return;
 
@@ -14821,23 +14887,28 @@ async function guardarTotalesTurno(){
           );
 
 
-      
-/* ==========================================
-   EXCLUIR DÉBITOS RECIBIDOS DEL
-   TOTAL DE ENTRADAS GUARDADAS
-========================================== */
+/* ======================================================
+   ACUMULAR ENTRADAS NORMALES
+
+   Los ingresos especiales NO se agregan al
+   acumulado general de Cierres.
+
+   Sus movimientos individuales permanecen
+   registrados en la hoja Detalle.
+====================================================== */
 
 const movimientoFila =
   fila.querySelector(
     '.operacion-movimiento'
   )?.value || '';
 
-if (
-  !esDebitoInternoChombo(
+const ingresoEspecial =
+  esIngresoEspecialChombo(
     modulo,
     movimientoFila
-  )
-) {
+  );
+
+if (!ingresoEspecial) {
 
   acumulados[clave].entrada +=
     numeroOperacion(
@@ -14847,7 +14918,6 @@ if (
     );
 
 }
-
 
 
         acumulados[
@@ -16006,12 +16076,20 @@ function recalcularTotalesOperaciones(){
 /* ===============================================
    SUMAR ENTRADAS DEL TURNO
 
-   Débitos recibidos:
-   - Aumentan Saldos
-   - No aumentan Total Entradas
-   - Celda con fondo gris
-   - Mantienen edición y decimales
-=============================================== */
+
+/* ======================================================
+   ENTRADAS DEL REGISTRO DE OPERACIONES
+
+   EXCEPCIONES:
+   - Débitos recibidos / Dennys
+   - Créditos electro recibidos
+
+   Estos movimientos:
+   - Conservan su valor en Entrada.
+   - Aumentan Saldos.
+   - No suman al Total general.
+   - Se identifican con fondo gris.
+====================================================== */
 
 document
   .querySelectorAll(
@@ -16022,18 +16100,22 @@ document
     const fila =
       campo.closest('.fila-operacion');
 
+    if (!fila) {
+      return;
+    }
+
     const modulo =
-      fila?.querySelector(
+      fila.querySelector(
         '.operacion-modulo'
       )?.value || '';
 
     const movimiento =
-      fila?.querySelector(
+      fila.querySelector(
         '.operacion-movimiento'
       )?.value || '';
 
-    const esDebito =
-      esDebitoInternoChombo(
+    const ingresoEspecial =
+      esIngresoEspecialChombo(
         modulo,
         movimiento
       );
@@ -16041,38 +16123,63 @@ document
     const celda =
       campo.closest('td');
 
-    /* COLOR GRIS PARA DÉBITOS RECIBIDOS */
+    /* IDENTIFICACIÓN VISUAL */
 
     if (celda) {
 
-      celda.style.setProperty(
-        'background-color',
-        esDebito ? '#d9d9d9' : '',
-        'important'
-      );
+      if (ingresoEspecial) {
 
-      celda.style.setProperty(
-        'background-image',
-        esDebito ? 'none' : '',
-        'important'
+        celda.style.setProperty(
+          'background-color',
+          '#d9d9d9',
+          'important'
+        );
+
+        celda.style.setProperty(
+          'background-image',
+          'none',
+          'important'
+        );
+
+      } else {
+
+        celda.style.removeProperty(
+          'background-color'
+        );
+
+        celda.style.removeProperty(
+          'background-image'
+        );
+
+      }
+
+    }
+
+    if (ingresoEspecial) {
+
+      campo.style.backgroundColor =
+        '#d9d9d9';
+
+    } else {
+
+      campo.style.removeProperty(
+        'background-color'
       );
 
     }
 
-    campo.style.backgroundColor =
-      esDebito ? '#d9d9d9' : '';
+    /* TOTAL GENERAL DE ENTRADAS */
 
-    /* NO SUMAR DÉBITOS AL TOTAL GENERAL */
-
-    if (!esDebito) {
+    if (!ingresoEspecial) {
 
       entradasMovimientos +=
-        numeroOperacion(campo.value);
+        numeroOperacion(
+          campo.value
+        );
 
     }
 
   });
-
 
   
   /* ===============================================
@@ -26974,20 +27081,42 @@ async function abrirConsultaDetalleChombo() {
         });
 
      
+
+/* ======================================================
+   TOTALES DE CONSULTA DETALLE
+
+   Se muestran todas las operaciones, incluidos
+   Débitos recibidos / Dennys y
+   Créditos electro recibidos.
+
+   Solo se excluyen del Total de Entradas.
+====================================================== */
+
 const suma = campo => registros.reduce(
   (total, r) => {
 
-    if (
-      campo === 'entrada' &&
-      esDebitoInternoChombo(
+    const ingresoEspecial =
+      esIngresoEspecialChombo(
         r.modulo,
         r.movimiento
-      )
+      );
+
+    if (
+      campo === 'entrada' &&
+      ingresoEspecial
     ) {
+
       return total;
+
     }
 
-    return total + Number(r[campo] || 0);
+    const valor = Number(
+      String(r[campo] ?? 0)
+        .replace(/,/g, '')
+    );
+
+    return total +
+      (Number.isFinite(valor) ? valor : 0);
 
   },
   0
