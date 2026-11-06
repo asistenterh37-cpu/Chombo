@@ -10539,14 +10539,17 @@ async function restaurarTurno(){
    selector.value = '';
   }
 
+
   /*
-  Preparar también Reportes del día.
+  Preparar la fecha de Reportes del día.
+  No consultar reportes_dia durante el inicio,
+  porque esa acción no existe en el GS actual.
   */
+
   reporteDiaCatalogoCargado = false;
 
   obtenerFechaReporteDia();
 
-  await cargarTurnosReporteDia();
 
  }
  catch(error){
