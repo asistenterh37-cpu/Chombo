@@ -15238,65 +15238,136 @@ const payload = {
   }
 
 
-  try{
+  
+  try {
 
+    const data = await jsonpRequest(
+      'guardar_totales_turno',
+      {
+        payload: JSON.stringify(payload)
+      }
+    );
 
-    const data =
-      await jsonpRequest(
-        'guardar_totales_turno',
-        {
-
-          payload:
-            JSON.stringify(
-              payload
-            )
-
-        }
-      );
-
-
-    if(
-      !data ||
-      data.ok !== true
-    ){
-
+    if (!data || data.ok !== true) {
       throw new Error(
         data?.message ||
-        'No se pudieron guardar los movimientos.'
+        'Apps Script no confirmó el guardado.'
       );
+    }
+
+    toast(
+      'Cierre guardado correctamente.',
+      true
+    );
+
+    limpiarFormularioOperacionesTurno();
+
+    // Las consultas posteriores no deben
+    // convertir un guardado exitoso en error.
+    const actualizaciones = await Promise.allSettled([
+      cargarUltimosArqueosCaja(),
+      cargarUltimosSaldos()
+    ]);
+
+    if (actualizaciones.some(
+      resultado => resultado.status === 'rejected'
+    )) {
+      console.warn(
+        'El cierre se guardó, pero alguna consulta posterior falló.',
+        actualizaciones
+      );
+    }
+
+  } catch (error) {
+
+    console.error(
+      'Respuesta del guardado:',
+      error
+    );
+
+    const mensaje = String(error?.message || error);
+
+    const errorComunicacion =
+      /conectar|respondió|respuesta|network|failed to fetch|load/i
+        .test(mensaje);
+
+    if (!errorComunicacion) {
+
+      toast(
+        'Error al guardar: ' + mensaje,
+        false
+      );
+
+    } else {
+
+      // La solicitud pudo haberse ejecutado en
+      // Apps Script aunque el navegador no
+      // recibiera la confirmación.
+      // Consultar sin realizar otro guardado.
+
+      toast(
+        'Verificando el cierre registrado...',
+        true
+      );
+
+      try {
+
+        const fechaTurno = String(
+          turnoActivo?.fechaTexto || ''
+        );
+
+        const partes = fechaTurno.split('/');
+
+        const fechaConsulta =
+          partes.length === 3
+            ? `${partes[2]}-${partes[1].padStart(2, '0')}-${partes[0].padStart(2, '0')}`
+            : localYMD(new Date());
+
+        const consulta = await jsonpRequest(
+          'impresion_cierre',
+          {
+            fecha: fechaConsulta,
+            turnoId: payload.turnoId
+          }
+        );
+
+        if (
+          consulta?.ok === true &&
+          Array.isArray(consulta.detalles) &&
+          consulta.detalles.length > 0
+        ) {
+
+          toast(
+            'Existen registros de este turno en Cierres. Verifica los importes antes de volver a guardar.',
+            true
+          );
+
+        } else {
+
+          toast(
+            'No se pudo confirmar el guardado. Revisa la hoja Cierres antes de intentar nuevamente.',
+            false
+          );
+
+        }
+
+      } catch (verificacionError) {
+
+        console.warn(
+          'No fue posible consultar el cierre:',
+          verificacionError
+        );
+
+        toast(
+          'No se recibió confirmación de Apps Script. Revisa Cierres antes de guardar otra vez.',
+          false
+        );
+
+      }
 
     }
 
-
- toast(
- 'Movimientos guardados correctamente.',
- true
-);
-
-/*
-Después de guardar,
-dejar formulario vacío.
-*/
-limpiarFormularioOperacionesTurno();
-
-/*
-Actualizar los selectores
-de caja y saldos guardados.
-*/
-await cargarUltimosArqueosCaja();
-await cargarUltimosSaldos();
-
-
   }
-  catch(error){
-
-
-    toast(
-      'Error al guardar: ' +
-      error.message,
-      false
-    );
-
 
   }
   finally{
