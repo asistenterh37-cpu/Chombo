@@ -7671,14 +7671,10 @@ const PAYMENT_METHODS = [
     descripcion:'Transferencias'
   },
 
+
   {
     key:'tarjetasVarias',
     descripcion:'Tarjetas varias'
-  },
-
-  {
-    key:'tigoMoney',
-    descripcion:'Tigo Money'
   }
 
 ];
@@ -9343,13 +9339,6 @@ function renderCierreRows(){
     ${partialRow({
       key:'tarjetasVarias',
       descripcion:'Tarjetas varias',
-      grupo:'formasPago'
-    })}
-
-
-    ${partialRow({
-      key:'tigoMoney',
-      descripcion:'Tigo Money',
       grupo:'formasPago'
     })}
 
@@ -14789,21 +14778,8 @@ async function guardarTotalesTurno(){
 
       entrada:0,
       salida:0
-    },
-
-    {
-      descripcion:
-        'Tigo Money',
-
-      parcial:
-        valorCampo(
-          'opPagoTigoMoney'
-        ),
-
-      entrada:0,
-      salida:0
     }
-
+ 
   ];
 
 
@@ -26851,8 +26827,8 @@ function capturarDetalleChombo() {
     ['Link de pago', 'opPagoLink', 'parcial'],
     ['Transferencias', 'opPagoTransferencias', 'parcial'],
     ['Tarjetas varias', 'opPagoTarjetasVarias', 'parcial'],
-    ['Tigo Money', 'opPagoTigoMoney', 'parcial'],
     ['Total formas de pago', 'opTotalFormasPago', 'entrada']
+
   ];
 
   const tid = String(
