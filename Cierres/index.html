@@ -15182,6 +15182,7 @@ const payload = {
 
 
   
+ 
   try {
 
     const data = await jsonpRequest(
@@ -15191,127 +15192,81 @@ const payload = {
       }
     );
 
-    if (!data || data.ok !== true) {
-      throw new Error(
-        data?.message ||
-        'Apps Script no confirmó el guardado.'
+    // Confirmación positiva enviada por Apps Script.
+    if (data && data.ok === true) {
+
+      console.log(
+        'Guardado confirmado:',
+        data
       );
-    }
 
-    toast(
-      'Cierre guardado correctamente.',
-      true
-    );
+      try {
+        limpiarFormularioOperacionesTurno();
+      } catch (errorLimpieza) {
+        console.warn(
+          'El cierre se guardó, pero falló la limpieza:',
+          errorLimpieza
+        );
+      }
 
-    limpiarFormularioOperacionesTurno();
+      toast(
+        'Cierre guardado correctamente.',
+        true
+      );
 
-    // Las consultas posteriores no deben
-    // convertir un guardado exitoso en error.
-    const actualizaciones = await Promise.allSettled([
-      cargarUltimosArqueosCaja(),
-      cargarUltimosSaldos()
-    ]);
+      // Consultas posteriores independientes del guardado.
+      const actualizaciones = await Promise.allSettled([
+        Promise.resolve().then(
+          () => cargarUltimosArqueosCaja()
+        ),
+        Promise.resolve().then(
+          () => cargarUltimosSaldos()
+        )
+      ]);
 
-    if (actualizaciones.some(
-      resultado => resultado.status === 'rejected'
-    )) {
+      actualizaciones.forEach(resultado => {
+        if (resultado.status === 'rejected') {
+          console.warn(
+            'No se pudo actualizar una consulta posterior:',
+            resultado.reason
+          );
+        }
+      });
+
+    } else {
+
+      // Apps Script respondió, pero no confirmó éxito.
+      // No afirmar que se guardó ni que no se guardó.
       console.warn(
-        'El cierre se guardó, pero alguna consulta posterior falló.',
-        actualizaciones
+        'Guardado no confirmado:',
+        data
       );
+
+      toast(
+        'El guardado no fue confirmado. Verifica Cierres y Detalle antes de repetirlo.',
+        false
+      );
+
     }
 
   } catch (error) {
 
-    console.error(
-      'Respuesta del guardado:',
+    console.warn(
+      'No se recibió confirmación del guardado:',
       error
     );
 
-    const mensaje = String(error?.message || error);
+    // Una falla de conexión puede ocurrir después
+    // de que Apps Script haya escrito los datos.
+    // No mostrar un falso "No se guardó".
 
-    const errorComunicacion =
-      /conectar|respondió|respuesta|network|failed to fetch|load/i
-        .test(mensaje);
-
-    if (!errorComunicacion) {
-
-      toast(
-        'Error al guardar: ' + mensaje,
-        false
-      );
-
-    } else {
-
-      // La solicitud pudo haberse ejecutado en
-      // Apps Script aunque el navegador no
-      // recibiera la confirmación.
-      // Consultar sin realizar otro guardado.
-
-      toast(
-        'Verificando el cierre registrado...',
-        true
-      );
-
-      try {
-
-        const fechaTurno = String(
-          turnoActivo?.fechaTexto || ''
-        );
-
-        const partes = fechaTurno.split('/');
-
-        const fechaConsulta =
-          partes.length === 3
-            ? `${partes[2]}-${partes[1].padStart(2, '0')}-${partes[0].padStart(2, '0')}`
-            : localYMD(new Date());
-
-        const consulta = await jsonpRequest(
-          'impresion_cierre',
-          {
-            fecha: fechaConsulta,
-            turnoId: payload.turnoId
-          }
-        );
-
-        if (
-          consulta?.ok === true &&
-          Array.isArray(consulta.detalles) &&
-          consulta.detalles.length > 0
-        ) {
-
-          toast(
-            'Existen registros de este turno en Cierres. Verifica los importes antes de volver a guardar.',
-            true
-          );
-
-        } else {
-
-          toast(
-            'No se pudo confirmar el guardado. Revisa la hoja Cierres antes de intentar nuevamente.',
-            false
-          );
-
-        }
-
-      } catch (verificacionError) {
-
-        console.warn(
-          'No fue posible consultar el cierre:',
-          verificacionError
-        );
-
-        toast(
-          'No se recibió confirmación de Apps Script. Revisa Cierres antes de guardar otra vez.',
-          false
-        );
-
-  
-      }
-
-    }
+    toast(
+      'No se recibió confirmación. El cierre podría estar guardado; verifica Cierres y Detalle antes de repetir.',
+      false
+    );
 
   }
+
 
   finally{
 
