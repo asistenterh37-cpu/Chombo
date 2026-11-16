@@ -4094,10 +4094,10 @@ const SCRIPT_URL =
       Turnos activos de hoy
      </label>
 
-     <select
-      id="turnoActivoSelect"
-     >
-
+   <select
+ id="turnoActivoSelect"
+ onchange="if(this.value) usarTurnoSeleccionado();"
+>
       <option value="">
        Seleccionar
       </option>
@@ -10925,11 +10925,24 @@ async function usarTurnoSeleccionado() {
     item => String(item.turnoId).trim() === turnoId
   );
 
+
   if (!turnoLista) {
     toast(
       'El turno no aparece en la lista. Actualiza la página.',
       false
     );
+    return;
+  }
+
+  const confirmado = window.confirm(
+    '¿Está seguro(a) que desea seleccionar este turno?\n\n' +
+    turnoId + ' - ' +
+    (turnoLista.ubicacion || '') + ' - ' +
+    (turnoLista.responsable || '')
+  );
+
+  if (!confirmado) {
+    select.value = '';
     return;
   }
 
@@ -17162,6 +17175,43 @@ function actualizarMovimientoFila(
    DESCRIPCION SEGUN MODULO / MOVIMIENTO
 ====================================================== */
 
+function filtrarProveedoresOperacion(campo) {
+
+  if (!campo) return;
+
+  const listaId = campo.getAttribute('list');
+  const lista = document.getElementById(listaId);
+
+  if (!lista) return;
+
+  const normalizar = texto =>
+    String(texto || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim()
+      .toLowerCase();
+
+  const busqueda = normalizar(campo.value);
+
+  const proveedores = (
+    catalogosData.proveedores || []
+  ).filter(nombre =>
+    normalizar(nombre).startsWith(busqueda)
+  );
+
+  lista.replaceChildren();
+
+  proveedores.forEach(nombre => {
+
+    const opcion = document.createElement('option');
+    opcion.value = nombre;
+    lista.appendChild(opcion);
+
+  });
+
+}
+
+  
 function actualizarDescripcionFila(
  elemento,
  valorAnterior = ''
@@ -17390,83 +17440,43 @@ function actualizarDescripcionFila(
 
  /* ==================================================
  PROVEEDORES
- DESCRIPCION = CATALOGO COLUMNA O
+ BUSQUEDA POR LETRAS
+ CATALOGO COLUMNA O
  ================================================== */
 
- if(
-  modulo ===
-  'proveedores'
- ){
+ if (modulo === 'proveedores') {
 
-  let html =
-   '<option value="">Seleccionar proveedor</option>';
+   const listaId =
+     'listaProveedores_' +
+     Math.random().toString(36).slice(2);
 
-
-  (
-   catalogosData.proveedores || []
-  )
-  .forEach(
-   nombre => {
-
-    html += `
-
-     <option
-      value="${escapeHtml(nombre)}"
+   celda.innerHTML = `
+     <input
+       type="text"
+       class="operacion-celda-select operacion-descripcion"
+       list="${listaId}"
+       placeholder="Escriba o seleccione proveedor"
+       autocomplete="off"
+       oninput="filtrarProveedoresOperacion(this)"
+       onchange="marcarHoraFilaOperacion(this)"
      >
-      ${escapeHtml(nombre)}
-     </option>
+     <datalist id="${listaId}"></datalist>
+   `;
 
-    `;
-
-   }
-  );
-
-
-  celda.innerHTML = `
-
-   <select
-
-    class="
-     operacion-celda-select
-     operacion-descripcion
-    "
-
-    onchange="
-     marcarHoraFilaOperacion(this);
-    "
-
-   >
-
-    ${html}
-
-   </select>
-
-  `;
-
-
-  if(valorAnterior){
-
-   const campo =
-    celda.querySelector(
+   const campo = celda.querySelector(
      '.operacion-descripcion'
-    );
+   );
 
-
-   if(campo){
-
-    campo.value =
-     valorAnterior;
-
+   if (campo) {
+     campo.value = valorAnterior || '';
+     filtrarProveedoresOperacion(campo);
    }
 
-  }
-
-
-  return;
-
+   return;
  }
 
 
+  
  /* ==================================================
  RECARGAS TIGO / CLARO
  ================================================== */
