@@ -3123,7 +3123,7 @@ tr{
 <script>
 
 const SCRIPT_URL =
-'https://script.google.com/macros/s/AKfycbwtMcqffV2U7amK0qToUK950O34OpOIcZWgiXek-CNmsWAvUUKZW7ZFa6uSRVvlAShl/exec';
+'https://script.google.com/macros/s/AKfycbyM6SYwipLxeYqRUOiq1JXS3tnDzOKC3QYDNZ7tdQ7P_LECh2bWpjwGWcvqGAVT-ENq/exec';
 
 </script>
 
@@ -8201,10 +8201,12 @@ async function cargarUltimosSaldos(){
     option.value =
     saldo.turnoId;
 
-    option.textContent =
-    saldo.turnoId +
-    ' | ' +
-    saldo.fechaTexto;
+  
+    option.textContent = [
+      saldo.turnoId,
+      saldo.fechaTexto,
+      saldo.responsable || 'Sin responsable'
+    ].join(' | ');
 
     select.appendChild(
      option
@@ -10617,9 +10619,11 @@ $('turnoCajaNo').value = '';
  ACTIVAR TURNO EN ESTE DISPOSITIVO
 ====================================================== */
 
+
 function activarTurno(
  turno
 ){
+aplicarBloqueoTurnoProcesado(false);
 limpiarFormularioOperacionesTurno();
   
  turnoActivo =
@@ -10909,6 +10913,107 @@ function seleccionarTurnoCierre(){
  VALIDAR, ACTIVAR Y ABRIR OPERACIONES
 ====================================================== */
 
+
+/* ======================================================
+   BLOQUEAR EDICION DE TURNOS PROCESADOS
+   Permite consultar, imprimir y cambiar de turno.
+====================================================== */
+
+let turnoProcesadoBloqueado = false;
+
+function aplicarBloqueoTurnoProcesado(procesado) {
+
+  turnoProcesadoBloqueado = Boolean(procesado);
+
+  const hoja = document.querySelector(
+    '#menuView .turno-operaciones-hoja'
+  );
+
+  if (!hoja) return;
+
+  const campos = hoja.querySelectorAll(
+    'input, select, textarea, button'
+  );
+
+  campos.forEach(campo => {
+
+    const accion = campo.getAttribute('onclick') || '';
+
+    // Estas acciones de consulta siguen disponibles.
+    if (
+      /abrirConsultaDetalleChombo|abrirImpresionCierreChombo|abrirCambioTurno/.test(accion)
+    ) {
+      return;
+    }
+
+    if (turnoProcesadoBloqueado) {
+
+      if (campo.dataset.bloqueadoPorCierre !== '1') {
+        campo.dataset.estadoDisabledAnterior =
+          campo.disabled ? '1' : '0';
+      }
+
+      campo.dataset.bloqueadoPorCierre = '1';
+      campo.disabled = true;
+
+    } else if (
+      campo.dataset.bloqueadoPorCierre === '1'
+    ) {
+
+      campo.disabled =
+        campo.dataset.estadoDisabledAnterior === '1';
+
+      delete campo.dataset.bloqueadoPorCierre;
+      delete campo.dataset.estadoDisabledAnterior;
+    }
+
+  });
+
+  const boton = document.getElementById(
+    'guardarTotalesTurnoBtn'
+  );
+
+  if (boton) {
+    boton.disabled = turnoProcesadoBloqueado;
+
+    boton.title = turnoProcesadoBloqueado
+      ? 'Este turno ya fue procesado y no puede modificarse.'
+      : '';
+  }
+
+  let aviso = document.getElementById(
+    'avisoTurnoProcesado'
+  );
+
+  if (turnoProcesadoBloqueado) {
+
+    if (!aviso) {
+      aviso = document.createElement('div');
+      aviso.id = 'avisoTurnoProcesado';
+      aviso.style.cssText = `
+        padding:12px;
+        background:#fff3cd;
+        color:#664d03;
+        border:1px solid #ffecb5;
+        border-radius:8px;
+        font-weight:bold;
+        margin:10px 0;
+        text-align:center;
+      `;
+
+      hoja.prepend(aviso);
+    }
+
+    aviso.textContent =
+      'TURNO PROCESADO — Solo consulta. ' +
+      'No se permiten nuevos cambios ni guardados.';
+
+  } else if (aviso) {
+    aviso.remove();
+  }
+}
+
+  
 async function usarTurnoSeleccionado() {
 
   const select = $('turnoActivoSelect');
@@ -10988,6 +11093,23 @@ async function usarTurnoSeleccionado() {
       );
     }
 
+    
+    // Consultar en Google Sheets si el cierre ya existe.
+    const consultaProcesado = await jsonpRequest(
+      'turno_procesado',
+      { turnoId: turnoId }
+    );
+
+    if (!consultaProcesado?.ok) {
+      throw new Error(
+        consultaProcesado?.message ||
+        'No se pudo verificar el estado del cierre.'
+      );
+    }
+
+    const yaProcesado =
+      consultaProcesado.procesado === true;
+
     // Verificar que exista la pantalla de operaciones.
     const vista = $('menuView');
 
@@ -11003,8 +11125,11 @@ async function usarTurnoSeleccionado() {
     // Activar la caja y cargar su información.
     try {
 
-      activarTurno(turno);
+            activarTurno(turno);
+      aplicarBloqueoTurnoProcesado(yaProcesado);
 
+           aplicarBloqueoTurnoProcesado(yaProcesado); 
+      
     } catch (errorActivacion) {
 
       console.error(
