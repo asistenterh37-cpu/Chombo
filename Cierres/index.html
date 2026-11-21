@@ -3123,7 +3123,7 @@ tr{
 <script>
 
 const SCRIPT_URL =
-'https://script.google.com/macros/s/AKfycbyM6SYwipLxeYqRUOiq1JXS3tnDzOKC3QYDNZ7tdQ7P_LECh2bWpjwGWcvqGAVT-ENq/exec';
+'https://script.google.com/macros/s/AKfycbz7bhCK73RmVoG0Yl4WnqxNGbx2bpROt6ZN8zzI-7h_wqEn3qbf1IzWqvGY-Tk16k0k/exec';
 
 </script>
 
@@ -27320,10 +27320,153 @@ const suma = campo => registros.reduce(
                   text-align:right
                 ">${moneda(suma(c))}</td>
               `).join('')}
+       
             </tr>
+
+            <tr style="
+              background:#e8eef7;
+              font-weight:bold;
+            ">
+              <td colspan="7" style="
+                border:1px solid #bbb;
+                padding:8px;
+                text-align:right;
+              ">
+                DIFERENCIA ENTRADAS - SALIDAS
+              </td>
+
+              <td style="
+                border:1px solid #bbb;
+                padding:8px;
+                text-align:right;
+                font-weight:900;
+              ">
+                ${moneda(suma('entrada') - suma('salida'))}
+              </td>
+            </tr>
+
           </tfoot>
         </table>
+
+        <h3 style="
+          text-align:center;
+          margin-top:25px;
+          margin-bottom:10px;
+        ">
+          DESGLOSE DE BILLETES Y MONEDAS
+        </h3>
+
+        ${
+          Array.isArray(data.arqueo) &&
+          data.arqueo.length > 0
+
+          ? `
+            <table style="
+              width:100%;
+              max-width:580px;
+              margin:auto;
+              border-collapse:collapse;
+              font-size:13px;
+            ">
+
+              <thead>
+                <tr style="background:#e8eef7">
+                  <th style="border:1px solid #bbb;padding:8px">
+                    Denominación
+                  </th>
+
+                  <th style="border:1px solid #bbb;padding:8px">
+                    Cantidad
+                  </th>
+
+                  <th style="border:1px solid #bbb;padding:8px">
+                    Valor
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                ${data.arqueo.map(item => `
+                  <tr>
+                    <td style="
+                      border:1px solid #ccc;
+                      padding:7px;
+                      text-align:center;
+                    ">
+                      ${moneda(item.denominacion)}
+                    </td>
+
+                    <td style="
+                      border:1px solid #ccc;
+                      padding:7px;
+                      text-align:center;
+                    ">
+                      ${Number(item.cantidad || 0)}
+                    </td>
+
+                    <td style="
+                      border:1px solid #ccc;
+                      padding:7px;
+                      text-align:right;
+                    ">
+                      ${moneda(item.valor)}
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+
+              <tfoot>
+                <tr style="
+                  background:#e8eef7;
+                  font-weight:bold;
+                ">
+
+                  <td style="border:1px solid #bbb;padding:8px">
+                    TOTAL ARQUEO
+                  </td>
+
+                  <td style="
+                    border:1px solid #bbb;
+                    padding:8px;
+                    text-align:center;
+                  ">
+                    ${data.arqueo.reduce(
+                      (total, item) =>
+                        total + Number(item.cantidad || 0),
+                      0
+                    )}
+                  </td>
+
+                  <td style="
+                    border:1px solid #bbb;
+                    padding:8px;
+                    text-align:right;
+                  ">
+                    ${moneda(data.arqueo.reduce(
+                      (total, item) =>
+                        total + Number(item.valor || 0),
+                      0
+                    ))}
+                  </td>
+
+                </tr>
+              </tfoot>
+
+            </table>
+          `
+
+          : `
+            <p style="
+              text-align:center;
+              color:#667085;
+            ">
+              No existe arqueo de caja guardado
+              para este turno.
+            </p>
+          `
+        }
       `;
+
 
     } catch (error) {
       resultado.textContent = error.message;
