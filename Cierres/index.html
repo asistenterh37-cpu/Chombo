@@ -10614,6 +10614,255 @@ $('turnoCajaNo').value = '';
 
 }
 
+/* ======================================================
+   CHOMBO - RESPALDO AUTOMATICO DE EMERGENCIA
+
+   - Guarda cada cambio en este navegador.
+   - Separa los borradores por TurnoID.
+   - Recupera operaciones, ventas y arqueo.
+   - No escribe datos en Google Sheets.
+   - No recupera turnos procesados.
+====================================================== */
+
+const PREFIJO_BORRADOR_CHOMBO = 'CHOMBO_BORRADOR_V1_';
+
+function claveBorradorChombo(turnoId) {
+  return PREFIJO_BORRADOR_CHOMBO +
+    String(turnoId || '').trim();
+}
+
+function guardarBorradorChombo() {
+
+  if (!turnoActivo?.turnoId) return;
+  if (typeof turnoProcesadoBloqueado !== 'undefined' &&
+      turnoProcesadoBloqueado) return;
+
+  const vista = document.getElementById('menuView');
+  if (!vista) return;
+
+  const campos = {};
+
+  vista.querySelectorAll(
+    'input[id^="op"], select[id^="op"], textarea[id^="op"]'
+  ).forEach(campo => {
+
+    if (campo.closest('#operacionesFilas')) return;
+
+    if (campo.type === 'checkbox') {
+      campos[campo.id] = campo.checked;
+    } else {
+      campos[campo.id] = campo.value;
+    }
+
+  });
+
+  const operaciones = Array.from(
+    document.querySelectorAll(
+      '#operacionesFilas .fila-operacion'
+    )
+  ).map(fila => {
+
+    const valor = selector =>
+      fila.querySelector(selector)?.value || '';
+
+    return {
+      hora: valor('.operacion-hora'),
+      modulo: valor('.operacion-modulo'),
+      movimiento: valor('.operacion-movimiento'),
+      descripcion: valor('.operacion-descripcion'),
+      parcial: valor('.operacion-parcial'),
+      entrada: valor('.operacion-entrada'),
+      salida: valor('.operacion-salida')
+    };
+
+  });
+
+  const borrador = {
+    version: 1,
+    turnoId: turnoActivo.turnoId,
+    ubicacion: turnoActivo.ubicacion || '',
+    responsable: turnoActivo.responsable || '',
+    actualizado: new Date().toISOString(),
+    campos,
+    operaciones
+  };
+
+  try {
+
+    localStorage.setItem(
+      claveBorradorChombo(turnoActivo.turnoId),
+      JSON.stringify(borrador)
+    );
+
+  } catch (error) {
+
+    console.error(
+      'No se pudo guardar el respaldo local:',
+      error
+    );
+
+  }
+}
+
+function eliminarBorradorChombo(turnoId) {
+
+  if (!turnoId) return;
+
+  try {
+    localStorage.removeItem(
+      claveBorradorChombo(turnoId)
+    );
+  } catch (error) {
+    console.warn(error);
+  }
+}
+
+function recuperarBorradorChombo() {
+
+  if (!turnoActivo?.turnoId) return;
+
+  if (typeof turnoProcesadoBloqueado !== 'undefined' &&
+      turnoProcesadoBloqueado) return;
+
+  const turnoId = turnoActivo.turnoId;
+  let borrador;
+
+  try {
+
+    const guardado = localStorage.getItem(
+      claveBorradorChombo(turnoId)
+    );
+
+    if (!guardado) return;
+
+    borrador = JSON.parse(guardado);
+
+  } catch (error) {
+    console.warn('Borrador ilegible:', error);
+    return;
+  }
+
+  if (!borrador || borrador.turnoId !== turnoId) return;
+
+  const fecha = borrador.actualizado
+    ? new Date(borrador.actualizado).toLocaleString('es-HN')
+    : 'Fecha desconocida';
+
+  const aceptar = window.confirm(
+    'CHOMBO - RECUPERACION DE DATOS\n\n' +
+    'Se encontró un formulario sin finalizar.\n\n' +
+    'Turno: ' + turnoId + '\n' +
+    'Responsable: ' + (borrador.responsable || '') + '\n' +
+    'Último respaldo: ' + fecha + '\n\n' +
+    '¿Desea recuperar los datos ingresados?\n\n' +
+    'Aceptar = Recuperar\n' +
+    'Cancelar = No recuperar'
+  );
+
+  if (!aceptar) return;
+
+  // Recuperar primero las filas dinámicas.
+  const tbody = document.getElementById('operacionesFilas');
+
+  if (tbody && Array.isArray(borrador.operaciones)) {
+
+    tbody.innerHTML = '';
+
+    borrador.operaciones.forEach(datos => {
+
+      const fila = crearFilaOperacion();
+      tbody.appendChild(fila);
+
+      const modulo = fila.querySelector('.operacion-modulo');
+      const movimiento = fila.querySelector('.operacion-movimiento');
+
+      if (modulo) {
+        modulo.value = datos.modulo || '';
+        actualizarMovimientoFila(modulo);
+      }
+
+      if (movimiento) {
+        movimiento.value = datos.movimiento || '';
+        actualizarDescripcionFila(
+          movimiento,
+          datos.descripcion || ''
+        );
+      }
+
+      const asignar = (selector, valor) => {
+        const campo = fila.querySelector(selector);
+        if (campo) campo.value = valor ?? '';
+      };
+
+      asignar('.operacion-hora', datos.hora);
+      asignar('.operacion-descripcion', datos.descripcion);
+      asignar('.operacion-parcial', datos.parcial);
+      asignar('.operacion-entrada', datos.entrada);
+      asignar('.operacion-salida', datos.salida);
+
+    });
+
+    if (typeof actualizarCantidadFilasOperacion === 'function') {
+      actualizarCantidadFilasOperacion();
+    }
+  }
+
+  // Recuperar control de ventas y arqueo.
+  Object.entries(borrador.campos || {}).forEach(
+    ([id, valor]) => {
+
+      const campo = document.getElementById(id);
+      if (!campo) return;
+
+      if (campo.type === 'checkbox') {
+        campo.checked = Boolean(valor);
+      } else {
+        campo.value = valor ?? '';
+      }
+
+    }
+  );
+
+  if (typeof recalcularControlVentas === 'function') {
+    recalcularControlVentas();
+  }
+
+  if (typeof recalcularTotalesOperaciones === 'function') {
+    recalcularTotalesOperaciones();
+  }
+
+  toast(
+    'Formulario recuperado correctamente. ' +
+    'Revise los valores antes de guardar el cierre.',
+    true
+  );
+}
+
+/* ======================================================
+   GUARDAR AUTOMATICAMENTE CADA CAMBIO
+====================================================== */
+
+document.addEventListener('input', function(evento) {
+
+  if (!evento.target.closest('#menuView')) return;
+
+  guardarBorradorChombo();
+
+}, true);
+
+document.addEventListener('change', function(evento) {
+
+  if (!evento.target.closest('#menuView')) return;
+
+  guardarBorradorChombo();
+
+}, true);
+
+// Última oportunidad al cerrar la página.
+window.addEventListener('pagehide', function() {
+  guardarBorradorChombo();
+});
+
 
 /* ======================================================
  ACTIVAR TURNO EN ESTE DISPOSITIVO
@@ -11125,10 +11374,15 @@ async function usarTurnoSeleccionado() {
     // Activar la caja y cargar su información.
     try {
 
-            activarTurno(turno);
-      aplicarBloqueoTurnoProcesado(yaProcesado);
+         
+    activarTurno(turno);
 
-           aplicarBloqueoTurnoProcesado(yaProcesado); 
+    aplicarBloqueoTurnoProcesado(yaProcesado);
+
+    if (!yaProcesado) {
+      recuperarBorradorChombo();
+    }
+
       
     } catch (errorActivacion) {
 
@@ -15391,10 +15645,16 @@ if (!confirmado) {
   }
 }
 
+
 if (confirmado) {
 
-  try {
-    limpiarFormularioOperacionesTurno();
+    // El cierre fue confirmado por Apps Script.
+    // Ya no se necesita el borrador de emergencia.
+    eliminarBorradorChombo(turnoActivo.turnoId);
+
+    try {
+        limpiarFormularioOperacionesTurno();
+
   } catch (errorLimpieza) {
     console.warn('Limpieza posterior:', errorLimpieza);
   }
